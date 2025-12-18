@@ -2,6 +2,12 @@
 
 MOBA Team Manager est une simulation de gestion d'e-sport développée en Python. Prenez les commandes d'une structure professionnelle, gérez votre budget, recrutez des talents et tentez de remporter le titre mondial.
 
+## ✅ Prérequis
+
+* Python 3.10+ (Python 3.11 recommandé pour la GUI)
+* Windows / Linux / macOS (les exemples ci-dessous montrent PowerShell sous Windows)
+* Dépendances Python (notamment `pygame` pour la GUI)
+
 ## 🚀 Fonctionnalités Clés
 
 * **Moteur de Match Dynamique** : Simulation minute par minute avec des probabilités évolutives selon la phase du match (Early, Mid, Late). Gain d'XP et statistiques individuelles (Kills, Assists, Deaths).
@@ -23,7 +29,35 @@ L'application propose une interface riche développée avec Pygame, incluant :
 
 ## 🛠️ Installation et Lancement
 
-**Prérequis** : Python 3.10 ou supérieur (Python 3.11 recommandé pour la GUI).
+### 1) Créer / activer un environnement virtuel (recommandé)
+
+Si un environnement `venv_py11` existe déjà dans ce dossier, vous pouvez l'utiliser directement.
+
+Sinon, exemple de création d'un venv (Python 3.11) :
+
+```powershell
+py -3.11 -m venv venv_py11
+```
+
+Activation :
+
+```powershell
+.\venv_py11\Scripts\Activate.ps1
+```
+
+### 2) Installer les dépendances
+
+Si vous avez un `requirements.txt`, installez-le :
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Sinon (minimum pour la GUI) :
+
+```powershell
+python -m pip install pygame
+```
 
 **Lancement de la version Console** :
 
@@ -32,10 +66,17 @@ python moba_manager.py
 ```
 
 **Lancement de l'interface Graphique (GUI)** :
-Un environnement virtuel `venv_py11` est déjà configuré.
+
+Si vous n'avez pas activé le venv, vous pouvez aussi appeler directement l'interpréteur du venv :
 
 ```powershell
 .\venv_py11\Scripts\python gui_main.py
+```
+
+Ou (si le venv est activé) :
+
+```powershell
+python gui_main.py
 ```
 
 **Exécution des tests** :
@@ -44,7 +85,11 @@ Un environnement virtuel `venv_py11` est déjà configuré.
 python test_all.py
 ```
 
-## 📊 Architecture Technique
+## � Sauvegardes
+
+La carrière est sauvegardée au format JSON. Si vous ne retrouvez pas vos fichiers, cherchez dans ce dossier de projet les fichiers `.json` créés après une sauvegarde (le nom exact dépend de la logique de sauvegarde).
+
+## �📊 Architecture Technique
 
 Le projet est structuré de manière modulaire :
 
@@ -62,3 +107,11 @@ Le projet est structuré de manière modulaire :
 * `[H]` : Revenir à l'accueil
 * `[Espace]` : Valider les choix (Draft) / Continuer après un match
 * `[Echap]` : Quitter
+
+## 🧰 Dépannage
+
+* **`ModuleNotFoundError: No module named 'pygame'`**
+  * Installez `pygame` dans le même environnement que celui utilisé pour lancer la GUI.
+  * Vérifiez quelle commande Python est utilisée (`python` vs `.\venv_py11\Scripts\python`).
+* **Erreur PowerShell lors de l'activation du venv**
+  * Vous pouvez lancer directement `.\venv_py11\Scripts\python gui_main.py` sans activer le venv.
