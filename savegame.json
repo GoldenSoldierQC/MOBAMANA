@@ -1,0 +1,231 @@
+{
+    "league_name": "Worlds 2025",
+    "standings": {
+        "234": {
+            "wins": 0,
+            "losses": 0
+        },
+        "G2 Esports": {
+            "wins": 0,
+            "losses": 0
+        }
+    },
+    "teams": [
+        {
+            "name": "234",
+            "prestige": 70,
+            "budget": 1000000,
+            "roster": {
+                "TOP": {
+                    "name": "Keen3",
+                    "age": 19,
+                    "market_value": 43436,
+                    "tier": "Rookie",
+                    "stats": {
+                        "mec": 72,
+                        "mac": 75,
+                        "vis": 73,
+                        "sng": 68,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 1200,
+                        "buyout_fee": 31200
+                    }
+                },
+                "JUNGLE": {
+                    "name": "SilentWolfX",
+                    "age": 20,
+                    "market_value": 63090,
+                    "tier": "Rookie",
+                    "stats": {
+                        "mec": 73,
+                        "mac": 67,
+                        "vis": 67,
+                        "sng": 75,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 1200,
+                        "buyout_fee": 31200
+                    }
+                },
+                "MID": {
+                    "name": "Shad0wVect0r",
+                    "age": 27,
+                    "market_value": 187696,
+                    "tier": "Pro",
+                    "stats": {
+                        "mec": 84,
+                        "mac": 84,
+                        "vis": 76,
+                        "sng": 74,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 5200,
+                        "buyout_fee": 135200
+                    }
+                },
+                "ADC": {
+                    "name": "Keen",
+                    "age": 28,
+                    "market_value": 45097,
+                    "tier": "Rookie",
+                    "stats": {
+                        "mec": 71,
+                        "mac": 70,
+                        "vis": 74,
+                        "sng": 68,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 1200,
+                        "buyout_fee": 31200
+                    }
+                },
+                "SUPPORT": {
+                    "name": "ArcticStride5",
+                    "age": 21,
+                    "market_value": 26488,
+                    "tier": "Rookie",
+                    "stats": {
+                        "mec": 72,
+                        "mac": 68,
+                        "vis": 75,
+                        "sng": 68,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 1200,
+                        "buyout_fee": 31200
+                    }
+                }
+            },
+            "bench": []
+        },
+        {
+            "name": "G2 Esports",
+            "prestige": 90,
+            "budget": 1200000,
+            "roster": {
+                "TOP": {
+                    "name": "RapidTempo",
+                    "age": 26,
+                    "market_value": 158597,
+                    "tier": "Pro",
+                    "stats": {
+                        "mec": 85,
+                        "mac": 85,
+                        "vis": 81,
+                        "sng": 85,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 5200,
+                        "buyout_fee": 135200
+                    }
+                },
+                "JUNGLE": {
+                    "name": "VoidCircuit",
+                    "age": 28,
+                    "market_value": 231653,
+                    "tier": "Pro",
+                    "stats": {
+                        "mec": 81,
+                        "mac": 72,
+                        "vis": 84,
+                        "sng": 83,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 5200,
+                        "buyout_fee": 135200
+                    }
+                },
+                "MID": {
+                    "name": "Echo",
+                    "age": 28,
+                    "market_value": 315140,
+                    "tier": "Pro",
+                    "stats": {
+                        "mec": 83,
+                        "mac": 76,
+                        "vis": 81,
+                        "sng": 74,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 5200,
+                        "buyout_fee": 135200
+                    }
+                },
+                "ADC": {
+                    "name": "VoidCaptain",
+                    "age": 24,
+                    "market_value": 286879,
+                    "tier": "Pro",
+                    "stats": {
+                        "mec": 85,
+                        "mac": 78,
+                        "vis": 82,
+                        "sng": 73,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 5200,
+                        "buyout_fee": 135200
+                    }
+                },
+                "SUPPORT": {
+                    "name": "Kairo",
+                    "age": 19,
+                    "market_value": 310267,
+                    "tier": "Pro",
+                    "stats": {
+                        "mec": 77,
+                        "mac": 78,
+                        "vis": 76,
+                        "sng": 75,
+                        "hero_mastery": {},
+                        "kills": 0,
+                        "deaths": 0,
+                        "assists": 0,
+                        "xp": 0,
+                        "level": 1,
+                        "salary": 5200,
+                        "buyout_fee": 135200
+                    }
+                }
+            },
+            "bench": []
+        }
+    ]
+}
