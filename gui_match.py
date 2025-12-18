@@ -12,13 +12,13 @@ class EnhancedMinimap:
         self.rect = pygame.Rect(x, y, width, height)
 
         self.lanes = {
-            "TOP": (self.rect.x + width * 0.25, self.rect.y + height * 0.20),
+            "BASE_A": (self.rect.x + width * 0.12, self.rect.y + height * 0.88),
+            "BASE_B": (self.rect.x + width * 0.88, self.rect.y + height * 0.12),
+            "TOP": (self.rect.x + width * 0.25, self.rect.y + height * 0.25),
             "MID": (self.rect.x + width * 0.50, self.rect.y + height * 0.50),
-            "BOT": (self.rect.x + width * 0.75, self.rect.y + height * 0.80),
-            "JUNGLE_TOP": (self.rect.x + width * 0.35, self.rect.y + height * 0.30),
-            "JUNGLE_BOT": (self.rect.x + width * 0.65, self.rect.y + height * 0.70),
-            "BASE_A": (self.rect.x + 20, self.rect.bottom - 20),
-            "BASE_B": (self.rect.right - 20, self.rect.y + 20),
+            "BOT": (self.rect.x + width * 0.75, self.rect.y + height * 0.75),
+            "JUNGLE_TOP": (self.rect.x + width * 0.42, self.rect.y + height * 0.32),
+            "JUNGLE_BOT": (self.rect.x + width * 0.58, self.rect.y + height * 0.68),
         }
 
         self.player_positions = {}
@@ -123,10 +123,62 @@ class EnhancedMinimap:
         self._draw_players(screen, team_b_players, color_b)
 
     def _draw_lanes(self, screen):
-        band_h = self.rect.h // 3
-        for i in range(1, 3):
-            y = self.rect.y + i * band_h
-            pygame.draw.line(screen, (45, 45, 55), (self.rect.x + 8, y), (self.rect.right - 8, y), 1)
+        inset = 10
+        inner = self.rect.inflate(-inset * 2, -inset * 2)
+        a = (int(inner.x + inner.w * 0.10), int(inner.y + inner.h * 0.90))
+        b = (int(inner.x + inner.w * 0.90), int(inner.y + inner.h * 0.10))
+        mid = (int(inner.centerx), int(inner.centery))
+
+        top_lane_start = (int(inner.x + inner.w * 0.12), int(inner.y + inner.h * 0.22))
+        top_lane_end = (int(inner.x + inner.w * 0.78), int(inner.y + inner.h * 0.12))
+        bot_lane_start = (int(inner.x + inner.w * 0.22), int(inner.y + inner.h * 0.88))
+        bot_lane_end = (int(inner.x + inner.w * 0.88), int(inner.y + inner.h * 0.78))
+
+        river1 = (int(inner.x + inner.w * 0.18), int(inner.y + inner.h * 0.55))
+        river2 = (int(inner.x + inner.w * 0.55), int(inner.y + inner.h * 0.18))
+        river3 = (int(inner.x + inner.w * 0.45), int(inner.y + inner.h * 0.82))
+        river4 = (int(inner.x + inner.w * 0.82), int(inner.y + inner.h * 0.45))
+
+        jungle_a = [(inner.x, inner.y + inner.h), (inner.x, int(inner.y + inner.h * 0.55)), (int(inner.x + inner.w * 0.55), inner.y + inner.h)]
+        jungle_b = [(inner.x + inner.w, inner.y), (int(inner.x + inner.w * 0.45), inner.y), (inner.x + inner.w, int(inner.y + inner.h * 0.45))]
+        pygame.draw.polygon(screen, (18, 38, 28), jungle_a)
+        pygame.draw.polygon(screen, (18, 38, 28), jungle_b)
+
+        pygame.draw.line(screen, (22, 42, 72), river1, river2, 6)
+        pygame.draw.line(screen, (22, 42, 72), river3, river4, 6)
+        pygame.draw.line(screen, (34, 60, 105), river1, river2, 2)
+        pygame.draw.line(screen, (34, 60, 105), river3, river4, 2)
+
+        lane_color = (70, 70, 85)
+        lane_edge = (110, 110, 130)
+
+        pygame.draw.line(screen, lane_color, a, mid, 6)
+        pygame.draw.line(screen, lane_edge, a, mid, 2)
+        pygame.draw.line(screen, lane_color, mid, b, 6)
+        pygame.draw.line(screen, lane_edge, mid, b, 2)
+
+        pygame.draw.line(screen, lane_color, top_lane_start, top_lane_end, 5)
+        pygame.draw.line(screen, lane_edge, top_lane_start, top_lane_end, 2)
+        pygame.draw.line(screen, lane_color, bot_lane_start, bot_lane_end, 5)
+        pygame.draw.line(screen, lane_edge, bot_lane_start, bot_lane_end, 2)
+
+        base_a = self.lanes["BASE_A"]
+        base_b = self.lanes["BASE_B"]
+        pygame.draw.circle(screen, (45, 120, 210), (int(base_a[0]), int(base_a[1])), 9)
+        pygame.draw.circle(screen, (255, 255, 255), (int(base_a[0]), int(base_a[1])), 9, 2)
+        pygame.draw.circle(screen, (210, 70, 70), (int(base_b[0]), int(base_b[1])), 9)
+        pygame.draw.circle(screen, (255, 255, 255), (int(base_b[0]), int(base_b[1])), 9, 2)
+
+        tower_color = (140, 140, 155)
+        for t in (
+            (inner.x + inner.w * 0.22, inner.y + inner.h * 0.78),
+            (inner.x + inner.w * 0.32, inner.y + inner.h * 0.68),
+            (inner.x + inner.w * 0.42, inner.y + inner.h * 0.58),
+            (inner.x + inner.w * 0.58, inner.y + inner.h * 0.42),
+            (inner.x + inner.w * 0.68, inner.y + inner.h * 0.32),
+            (inner.x + inner.w * 0.78, inner.y + inner.h * 0.22),
+        ):
+            pygame.draw.circle(screen, tower_color, (int(t[0]), int(t[1])), 3)
 
     def _draw_map_events(self, screen):
         current_time = pygame.time.get_ticks()
@@ -222,17 +274,17 @@ class MatchDashboard:
         
         # Définition des boutons de vitesse (x1, x2, x4, ||)
         self.speed_buttons = {
-            "PAUSE": pygame.Rect(1000, 540, 60, 30),
-            "x1": pygame.Rect(1070, 540, 40, 30),
-            "x2": pygame.Rect(1120, 540, 40, 30),
-            "x4": pygame.Rect(1170, 540, 40, 30)
+            "PAUSE": pygame.Rect(950, 540, 60, 30),
+            "x1": pygame.Rect(1020, 540, 40, 30),
+            "x2": pygame.Rect(1070, 540, 40, 30),
+            "x4": pygame.Rect(1120, 540, 40, 30)
         }
 
         # Sliders tactiques globaux pour l'équipe Bleue
         self.slider_aggro = Slider(350, 550, 200, 10, "Agressivité")
         self.slider_focus = Slider(650, 550, 200, 10, "Focus")
 
-        self.minimap = EnhancedMinimap(320, 80, 250, 250)
+        self.minimap = EnhancedMinimap(320, 80, 650, 300)
         self._last_minimap_log_idx = 0
 
     def update(self):
@@ -501,26 +553,35 @@ class MatchDashboard:
 
     def draw_event_log(self):
         """Affiche le log avec un code couleur et des icônes textuelles."""
-        log_rect = pygame.Rect(950, 580, 320, 130)
-        pygame.draw.rect(self.screen, (15, 15, 20), log_rect, border_radius=5)
-        pygame.draw.rect(self.screen, (40, 40, 50), log_rect, width=1, border_radius=5)
-        
-        # On affiche les 5 derniers messages
-        for i, event in enumerate(self.engine.logs[-5:]):
-            y_pos = 590 + (i * 22)
-            
-            # Choix de la couleur selon l'équipe
-            color = self.BLUE if event["team"] == "A" else self.RED
-            if event.get("type") == "TACTIC":
-                color = self.GOLD
-            
-            # Préfixe d'icône
-            icon = "[KILL]" if event["type"] == "KILL" else "[OBJ]"
-            if event["type"] == "TACTIC":
-                icon = "[TAC]"
+        left_rect = pygame.Rect(10, 580, 280, 135)
+        right_rect = pygame.Rect(990, 580, 280, 135)
 
-            msg_surf = self.font_log.render(f"{icon} {event['msg']}", True, color)
-            self.screen.blit(msg_surf, (960, y_pos))
+        def draw_panel(rect, team_letter, title, accent_color):
+            pygame.draw.rect(self.screen, (15, 15, 20), rect, border_radius=5)
+            pygame.draw.rect(self.screen, (40, 40, 50), rect, width=1, border_radius=5)
+            pygame.draw.rect(self.screen, accent_color, (rect.x, rect.y, 4, rect.h), border_radius=5)
+
+            title_surf = self.font_log.render(title, True, (220, 220, 230))
+            self.screen.blit(title_surf, (rect.x + 10, rect.y + 6))
+
+            team_events = [e for e in self.engine.logs if e.get("team") == team_letter]
+            team_events = team_events[-4:]
+            for i, event in enumerate(team_events):
+                y_pos = rect.y + 32 + (i * 22)
+
+                color = accent_color
+                if event.get("type") == "TACTIC":
+                    color = self.GOLD
+
+                icon = "[KILL]" if event.get("type") == "KILL" else "[OBJ]"
+                if event.get("type") == "TACTIC":
+                    icon = "[TAC]"
+
+                msg_surf = self.font_log.render(f"{icon} {event['msg']}", True, color)
+                self.screen.blit(msg_surf, (rect.x + 10, y_pos))
+
+        draw_panel(left_rect, "A", "Log Team A", self.BLUE)
+        draw_panel(right_rect, "B", "Log Team B", self.RED)
 
     def draw_momentum_graph(self):
         rect = pygame.Rect(320, 430, 650, 60)
