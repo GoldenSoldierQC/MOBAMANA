@@ -1,7 +1,155 @@
+import math
+import random
+from typing import Optional
+
 import pygame
 from gui_setup import draw_team_logo
 
 WHITE = (255, 255, 255)
+
+class EnhancedMinimap:
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+
+        self.lanes = {
+            "TOP": (self.rect.x + width * 0.25, self.rect.y + height * 0.20),
+            "MID": (self.rect.x + width * 0.50, self.rect.y + height * 0.50),
+            "BOT": (self.rect.x + width * 0.75, self.rect.y + height * 0.80),
+            "JUNGLE_TOP": (self.rect.x + width * 0.35, self.rect.y + height * 0.30),
+            "JUNGLE_BOT": (self.rect.x + width * 0.65, self.rect.y + height * 0.70),
+            "BASE_A": (self.rect.x + 20, self.rect.bottom - 20),
+            "BASE_B": (self.rect.right - 20, self.rect.y + 20),
+        }
+
+        self.player_positions = {}
+        self.player_targets = {}
+        self.movement_history = {}
+        self.map_events = []
+
+        self._last_tick_ms = pygame.time.get_ticks()
+
+    def update_player_action(self, player, team_side: str, game_phase, current_minute):
+        player_id = id(player)
+        target_pos = self._calculate_target_position(player, team_side, game_phase)
+
+        if player_id not in self.player_positions:
+            self.player_positions[player_id] = target_pos
+            self.player_targets[player_id] = target_pos
+        else:
+            self.player_targets[player_id] = target_pos
+
+    def _is_player_dead(self, player) -> bool:
+        return bool(
+            getattr(player, "is_dead", False)
+            or getattr(player, "dead", False)
+            or getattr(player, "is_ko", False)
+        )
+
+    def _calculate_target_position(self, player, team_side: str, game_phase):
+        if self._is_player_dead(player):
+            return self.lanes["BASE_A"] if team_side == "A" else self.lanes["BASE_B"]
+
+        role_name = getattr(getattr(player, "role", None), "name", None)
+        if not role_name:
+            role_name = str(getattr(player, "role", "MID"))
+        role_name = role_name.upper()
+
+        priority = getattr(player, "priority", "Lane")
+
+        if role_name == "JUNGLE":
+            if priority == "Roam":
+                return random.choice([
+                    self.lanes["JUNGLE_TOP"],
+                    self.lanes["JUNGLE_BOT"],
+                    self.lanes["MID"],
+                ])
+            return self.lanes["JUNGLE_TOP"]
+
+        if priority == "Roam" and role_name in {"SUPPORT", "ADC"}:
+            return self.lanes["MID"]
+
+        if priority == "Obj":
+            return self.lanes["MID"]
+
+        if role_name == "TOP":
+            return self.lanes["TOP"]
+        if role_name in {"ADC", "SUPPORT"}:
+            return self.lanes["BOT"]
+        return self.lanes["MID"]
+
+    def interpolate_positions(self, delta_time: Optional[float] = None):
+        if delta_time is None:
+            now = pygame.time.get_ticks()
+            delta_time = max(0.0, (now - self._last_tick_ms) / 1000.0)
+            self._last_tick_ms = now
+
+        speed = 220.0
+        step = speed * delta_time
+        if step <= 0:
+            return
+
+        for player_id in list(self.player_positions.keys()):
+            current = self.player_positions[player_id]
+            target = self.player_targets.get(player_id, current)
+
+            dx = target[0] - current[0]
+            dy = target[1] - current[1]
+            distance = math.sqrt(dx * dx + dy * dy)
+            if distance < 1.5:
+                self.player_positions[player_id] = target
+                continue
+
+            ratio = min(1.0, step / distance)
+            new_pos = (current[0] + dx * ratio, current[1] + dy * ratio)
+            self.player_positions[player_id] = new_pos
+
+            history = self.movement_history.setdefault(player_id, [])
+            history.append((*new_pos, pygame.time.get_ticks()))
+            if len(history) > 20:
+                history.pop(0)
+
+    def register_event(self, x, y, event_type):
+        self.map_events.append((x, y, event_type, pygame.time.get_ticks()))
+        current_time = pygame.time.get_ticks()
+        self.map_events = [e for e in self.map_events if current_time - e[3] < 5000]
+
+    def draw(self, screen, team_a_players, team_b_players, color_a, color_b):
+        pygame.draw.rect(screen, (20, 25, 35), self.rect, border_radius=10)
+        pygame.draw.rect(screen, (60, 60, 70), self.rect, 2, border_radius=10)
+
+        self._draw_lanes(screen)
+        self._draw_map_events(screen)
+        self._draw_players(screen, team_a_players, color_a)
+        self._draw_players(screen, team_b_players, color_b)
+
+    def _draw_lanes(self, screen):
+        band_h = self.rect.h // 3
+        for i in range(1, 3):
+            y = self.rect.y + i * band_h
+            pygame.draw.line(screen, (45, 45, 55), (self.rect.x + 8, y), (self.rect.right - 8, y), 1)
+
+    def _draw_map_events(self, screen):
+        current_time = pygame.time.get_ticks()
+        for x, y, event_type, timestamp in self.map_events:
+            age = current_time - timestamp
+            alpha = max(0, 255 - (age / 5000) * 255)
+
+            if event_type == "KILL":
+                color = (255, 50, 50, int(alpha))
+                pygame.draw.circle(screen, color[:3], (int(x), int(y)), 12, 2)
+            elif event_type == "OBJECTIVE":
+                color = (255, 215, 0, int(alpha))
+                pygame.draw.circle(screen, color[:3], (int(x), int(y)), 15, 3)
+
+    def _draw_players(self, screen, players, color):
+        for player in players:
+            player_id = id(player)
+            if player_id not in self.player_positions:
+                continue
+
+            pos = self.player_positions[player_id]
+            pygame.draw.circle(screen, color, (int(pos[0]), int(pos[1])), 6)
+            pygame.draw.circle(screen, (255, 255, 255), (int(pos[0]), int(pos[1])), 6, 1)
 
 class Slider:
     def __init__(self, x, y, w, h, label, min_val=0.5, max_val=1.5):
@@ -46,11 +194,13 @@ class Slider:
         elif event.type == pygame.MOUSEMOTION and self.grabbed:
             self.update_val(event.pos)
             return True
+
         return False
 
     def update_val(self, mouse_pos):
         rel_x = max(0, min(mouse_pos[0] - self.rect.x, self.rect.w))
         self.val = self.min_val + (rel_x / self.rect.w) * (self.max_val - self.min_val)
+
 
 class MatchDashboard:
     def __init__(self, screen, match_engine):
@@ -81,6 +231,9 @@ class MatchDashboard:
         self.slider_aggro = Slider(350, 550, 200, 10, "Agressivité")
         self.slider_focus = Slider(650, 550, 200, 10, "Focus")
 
+        self.minimap = EnhancedMinimap(320, 80, 250, 250)
+        self._last_minimap_log_idx = 0
+
     def update(self):
         """Fait progresser le match selon la vitesse choisie."""
         if not self.engine.is_finished and not self.is_paused:
@@ -88,6 +241,54 @@ class MatchDashboard:
                 if not self.engine.is_finished:
                     self.engine.simulate_step()
                     self._record_history_if_needed()
+
+                    self._sync_minimap_events()
+
+                    game_phase = self._get_current_phase()
+                    for p in self.engine.team_a.players:
+                        self.minimap.update_player_action(p, "A", game_phase, self.engine.current_minute)
+                    for p in self.engine.team_b.players:
+                        self.minimap.update_player_action(p, "B", game_phase, self.engine.current_minute)
+
+        self.minimap.interpolate_positions()
+
+    def _sync_minimap_events(self):
+        """Transforme les nouveaux événements du log en pings visuels sur la minimap."""
+        logs = getattr(self.engine, "logs", [])
+        if not logs:
+            return
+
+        start_idx = max(0, min(self._last_minimap_log_idx, len(logs)))
+        new_events = logs[start_idx:]
+        self._last_minimap_log_idx = len(logs)
+
+        for ev in new_events:
+            ev_type = ev.get("type")
+            if ev_type not in {"KILL", "OBJECTIVE"}:
+                continue
+
+            team = ev.get("team")
+            if team == "A":
+                team_players = self.engine.team_a.players
+                team_side = "A"
+            else:
+                team_players = self.engine.team_b.players
+                team_side = "B"
+
+            if ev_type == "KILL" and team_players:
+                ref_player = random.choice(team_players)
+                x, y = self.minimap._calculate_target_position(ref_player, team_side, self._get_current_phase())
+                self.minimap.register_event(x, y, "KILL")
+            elif ev_type == "OBJECTIVE":
+                x, y = self.minimap.lanes["MID"]
+                self.minimap.register_event(x, y, "OBJECTIVE")
+
+    def _get_current_phase(self):
+        if self.engine.current_minute <= 10:
+            return "EARLY"
+        if self.engine.current_minute <= 20:
+            return "MID"
+        return "LATE"
 
     def _record_history_if_needed(self):
         minute = self.engine.current_minute
@@ -156,7 +357,13 @@ class MatchDashboard:
 
     def draw(self):
         self.draw_top_bar()
-        self.draw_minimap()
+        self.minimap.draw(
+            self.screen,
+            self.engine.team_a.players,
+            self.engine.team_b.players,
+            self.BLUE,
+            self.RED,
+        )
         self.draw_sidebars()
         self.draw_timeline()
         self.draw_momentum_graph()
@@ -166,52 +373,6 @@ class MatchDashboard:
         
         if self.engine.is_finished:
             self.draw_end_screen()
-
-    def draw_minimap(self):
-        map_rect = pygame.Rect(320, 80, 250, 250)
-        pygame.draw.rect(self.screen, (20, 25, 35), map_rect, border_radius=10)
-        pygame.draw.rect(self.screen, (60, 60, 70), map_rect, 2, border_radius=10)
-
-        # 3 bandes horizontales (TOP / MID / BOT)
-        band_h = map_rect.h // 3
-        for i in range(1, 3):
-            y = map_rect.y + i * band_h
-            pygame.draw.line(self.screen, (45, 45, 55), (map_rect.x + 8, y), (map_rect.right - 8, y), 1)
-
-        lanes = {
-            "TOP": (map_rect.x + map_rect.w * 0.25, map_rect.y + band_h * 0.5),
-            "MID": (map_rect.x + map_rect.w * 0.50, map_rect.y + band_h * 1.5),
-            "BOT": (map_rect.x + map_rect.w * 0.75, map_rect.y + band_h * 2.5),
-            "BASE_A": (map_rect.x + 20, map_rect.bottom - 20),
-            "BASE_B": (map_rect.right - 20, map_rect.y + 20),
-        }
-
-        def role_to_lane_key(player) -> str:
-            role_name = getattr(getattr(player, "role", None), "name", None)
-            if not role_name:
-                role_name = str(getattr(player, "role", "MID"))
-            role_name = role_name.upper()
-
-            if role_name == "TOP":
-                return "TOP"
-            if role_name in {"ADC", "SUPPORT"}:
-                return "BOT"
-            return "MID"
-
-        def is_player_dead(player) -> bool:
-            return bool(
-                getattr(player, "is_dead", False)
-                or getattr(player, "dead", False)
-                or getattr(player, "is_ko", False)
-            )
-
-        for p in self.engine.team_a.players:
-            pos = lanes["BASE_A"] if is_player_dead(p) else lanes.get(role_to_lane_key(p), lanes["MID"])
-            pygame.draw.circle(self.screen, self.BLUE, (int(pos[0]), int(pos[1])), 6)
-
-        for p in self.engine.team_b.players:
-            pos = lanes["BASE_B"] if is_player_dead(p) else lanes.get(role_to_lane_key(p), lanes["MID"])
-            pygame.draw.circle(self.screen, self.RED, (int(pos[0]), int(pos[1])), 6)
 
     def draw_tactics(self):
         """Dessine les sliders tactiques globaux dans un panneau dédié."""
