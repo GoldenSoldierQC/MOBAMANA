@@ -151,6 +151,7 @@ class EnhancedMinimap:
             pygame.draw.circle(screen, color, (int(pos[0]), int(pos[1])), 6)
             pygame.draw.circle(screen, (255, 255, 255), (int(pos[0]), int(pos[1])), 6, 1)
 
+
 class Slider:
     def __init__(self, x, y, w, h, label, min_val=0.5, max_val=1.5):
         self.rect = pygame.Rect(x, y, w, h)
@@ -267,20 +268,22 @@ class MatchDashboard:
             if ev_type not in {"KILL", "OBJECTIVE"}:
                 continue
 
-            team = ev.get("team")
-            if team == "A":
-                team_players = self.engine.team_a.players
-                team_side = "A"
+            location_role = str(ev.get("location_role", "MID")).upper()
+            if location_role == "JUNGLE":
+                base_x, base_y = random.choice([self.minimap.lanes["JUNGLE_TOP"], self.minimap.lanes["JUNGLE_BOT"]])
+            elif location_role == "TOP":
+                base_x, base_y = self.minimap.lanes["TOP"]
+            elif location_role in {"BOT", "ADC", "SUPPORT"}:
+                base_x, base_y = self.minimap.lanes["BOT"]
             else:
-                team_players = self.engine.team_b.players
-                team_side = "B"
+                base_x, base_y = self.minimap.lanes["MID"]
 
-            if ev_type == "KILL" and team_players:
-                ref_player = random.choice(team_players)
-                x, y = self.minimap._calculate_target_position(ref_player, team_side, self._get_current_phase())
+            x = base_x + random.randint(-15, 15)
+            y = base_y + random.randint(-15, 15)
+
+            if ev_type == "KILL":
                 self.minimap.register_event(x, y, "KILL")
-            elif ev_type == "OBJECTIVE":
-                x, y = self.minimap.lanes["MID"]
+            else:
                 self.minimap.register_event(x, y, "OBJECTIVE")
 
     def _get_current_phase(self):

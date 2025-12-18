@@ -618,17 +618,26 @@ class MatchSimulator:
             # Création du message structuré
             team_letter = "A" if winner_key == "blue" else "B"
             event_type = "KILL" if et == "KILL" else "OBJECTIVE"
+            location_role = "MID"
             
             if et == "KILL":
                 msg = f"{killer.name} a elimine un adversaire !"
+                location_role = getattr(getattr(killer, "role", None), "name", "MID")
             else:
                 msg = f"L'equipe {'bleue' if winner_key == 'blue' else 'rouge'} a pris un objectif ({self.EVENT_VALUES[et]['label']})."
+
+                if et == "TOWER":
+                    location_role = random.choice(["TOP", "MID", "BOT"])
+                elif et in {"BARON", "ELDER", "STEAL"}:
+                    location_role = "JUNGLE"
 
             self.logs.append({
                 "type": event_type,
                 "team": team_letter,
                 "minute": self.current_minute,
-                "msg": f"[{self.current_minute}'] {msg}"
+                "msg": f"[{self.current_minute}'] {msg}",
+                "event_subtype": et,
+                "location_role": location_role,
             })
 
         # 3. L'IA adapte ses tactiques toutes les 3 minutes
