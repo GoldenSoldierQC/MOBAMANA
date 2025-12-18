@@ -1,7 +1,7 @@
 import pygame
 import sys
 import math
-from moba_manager import Team, Role, CalibrationTools, MatchSimulator, create_initial_roster
+from moba_manager import Team, Role, CalibrationTools, MatchSimulator, create_initial_roster, load_game
 from gui_match import MatchDashboard
 from gui_market import MarketManager
 
@@ -27,6 +27,8 @@ STATE_MATCH = "match"
 STATE_DRAFT = "draft"
 STATE_MARKET = "market"
 STATE_SETUP = "setup"
+STATE_MAIN_MENU = "main_menu"
+STATE_SETTINGS = "settings"
 
 
 class MobaGui:
@@ -38,7 +40,7 @@ class MobaGui:
         self.running = True
         
         # L'état actuel de l'interface
-        self.current_state = STATE_SETUP
+        self.current_state = STATE_MAIN_MENU
         
         # Chargement des polices
         self.title_font = pygame.font.Font(None, 74)
@@ -47,6 +49,13 @@ class MobaGui:
 
         from gui_setup import ProfileSetup
         self.setup_manager = ProfileSetup(self.screen)
+
+        self.settings = {
+            "show_fps": False,
+        }
+
+        self.menu_buttons = {}
+        self.settings_buttons = {}
 
         # --- CONNEXION AU BACKEND ---
         # Création d'équipes de démonstration
@@ -110,6 +119,18 @@ class MobaGui:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+
+            if self.current_state == STATE_MAIN_MENU:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.running = False
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self._handle_main_menu_click(event.pos)
+
+            if self.current_state == STATE_SETTINGS:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.current_state = STATE_MAIN_MENU
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self._handle_settings_click(event.pos)
             
             # Navigation
             if event.type == pygame.KEYDOWN:
@@ -151,6 +172,8 @@ class MobaGui:
 
 
     def update(self):
+        if self.current_state in {STATE_MAIN_MENU, STATE_SETTINGS}:
+            return
         if self.current_state == STATE_SETUP:
             if self.setup_manager.done:
                 self.team_blue = create_initial_roster(
@@ -207,6 +230,16 @@ class MobaGui:
 
     def draw(self):
         self.screen.fill(BG_DARK)
+
+        if self.current_state == STATE_MAIN_MENU:
+            self.draw_main_menu()
+            pygame.display.flip()
+            return
+
+        if self.current_state == STATE_SETTINGS:
+            self.draw_settings()
+            pygame.display.flip()
+            return
         
         if self.current_state == STATE_HOME:
             self.draw_home()
@@ -222,6 +255,127 @@ class MobaGui:
             self.setup_manager.draw()
             
         pygame.display.flip()
+
+    def _set_setup_state(self):
+        from gui_setup import ProfileSetup
+        self.setup_manager = ProfileSetup(self.screen)
+        self.current_state = STATE_SETUP
+
+    def _apply_loaded_league(self, league):
+        teams = getattr(league, "teams", None) or []
+        if len(teams) < 2:
+            return False
+
+        self.league = league
+        self.team_blue = teams[0]
+        self.team_red = teams[1]
+        self.team_name = self.team_blue.name
+
+        self.market_manager = MarketManager(self.screen, self.league.market, self.team_blue.finance, self.draw_radar_chart)
+        self.match_simulator = MatchSimulator(self.team_blue, self.team_red)
+        self.match_dashboard = MatchDashboard(self.screen, self.match_simulator)
+
+        self.draft_manager = DraftManager(self.screen)
+        self.draft_manager.color_a = self.team_blue.team_color
+        self.match_dashboard.BLUE = self.team_blue.team_color
+        self.match_dashboard.RED = self.team_red.team_color
+        return True
+
+    def _handle_main_menu_click(self, pos):
+        for key, rect in self.menu_buttons.items():
+            if not rect.collidepoint(pos):
+                continue
+            if key == "new":
+                self._set_setup_state()
+                return
+            if key == "load":
+                league = load_game("savegame.json")
+                if league:
+                    if self._apply_loaded_league(league):
+                        self.current_state = STATE_HOME
+                return
+            if key == "settings":
+                self.current_state = STATE_SETTINGS
+                return
+            if key == "quit":
+                self.running = False
+                return
+
+    def _handle_settings_click(self, pos):
+        for key, rect in self.settings_buttons.items():
+            if not rect.collidepoint(pos):
+                continue
+            if key == "toggle_fps":
+                self.settings["show_fps"] = not self.settings.get("show_fps", False)
+                return
+            if key == "back":
+                self.current_state = STATE_MAIN_MENU
+                return
+
+    def draw_main_menu(self):
+        self.screen.fill(BG_DARK)
+
+        title = self.title_font.render("MOBA MANAGER 2025", True, GOLD)
+        self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 90))
+
+        btn_w = 420
+        btn_h = 60
+        start_y = 240
+        gap = 18
+
+        items = [
+            ("new", "Nouvelle partie"),
+            ("load", "Charger partie"),
+            ("settings", "Paramètres"),
+            ("quit", "Quitter"),
+        ]
+
+        self.menu_buttons = {}
+        for i, (key, label) in enumerate(items):
+            rect = pygame.Rect(SCREEN_WIDTH // 2 - btn_w // 2, start_y + i * (btn_h + gap), btn_w, btn_h)
+            self.menu_buttons[key] = rect
+
+            is_hover = rect.collidepoint(pygame.mouse.get_pos())
+            bg = (45, 45, 60) if not is_hover else (60, 60, 80)
+            pygame.draw.rect(self.screen, bg, rect, border_radius=12)
+            pygame.draw.rect(self.screen, (90, 90, 110), rect, width=2, border_radius=12)
+
+            txt = self.text_font.render(label, True, WHITE)
+            self.screen.blit(txt, (rect.centerx - txt.get_width() // 2, rect.centery - txt.get_height() // 2))
+
+        hint = self.small_font.render("Astuce: [H] Home, [D] Draft, [M] Market, [R] Roster", True, (140, 140, 155))
+        self.screen.blit(hint, (SCREEN_WIDTH // 2 - hint.get_width() // 2, 660))
+
+    def draw_settings(self):
+        self.screen.fill(BG_DARK)
+
+        title = self.title_font.render("PARAMÈTRES", True, GOLD)
+        self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 90))
+
+        panel = pygame.Rect(SCREEN_WIDTH // 2 - 360, 200, 720, 360)
+        pygame.draw.rect(self.screen, (20, 20, 30), panel, border_radius=14)
+        pygame.draw.rect(self.screen, (50, 50, 65), panel, width=2, border_radius=14)
+
+        self.settings_buttons = {}
+
+        toggle_rect = pygame.Rect(panel.x + 60, panel.y + 80, panel.w - 120, 60)
+        self.settings_buttons["toggle_fps"] = toggle_rect
+        is_hover = toggle_rect.collidepoint(pygame.mouse.get_pos())
+        bg = (45, 45, 60) if not is_hover else (60, 60, 80)
+        pygame.draw.rect(self.screen, bg, toggle_rect, border_radius=12)
+        pygame.draw.rect(self.screen, (90, 90, 110), toggle_rect, width=2, border_radius=12)
+        value = "ON" if self.settings.get("show_fps", False) else "OFF"
+        txt = self.text_font.render(f"Afficher FPS : {value}", True, WHITE)
+        self.screen.blit(txt, (toggle_rect.centerx - txt.get_width() // 2, toggle_rect.centery - txt.get_height() // 2))
+
+        back_rect = pygame.Rect(panel.x + 60, panel.bottom - 100, panel.w - 120, 60)
+        self.settings_buttons["back"] = back_rect
+        is_hover = back_rect.collidepoint(pygame.mouse.get_pos())
+        bg = (45, 45, 60) if not is_hover else (60, 60, 80)
+        pygame.draw.rect(self.screen, bg, back_rect, border_radius=12)
+        pygame.draw.rect(self.screen, (90, 90, 110), back_rect, width=2, border_radius=12)
+        txt = self.text_font.render("Retour", True, WHITE)
+        self.screen.blit(txt, (back_rect.centerx - txt.get_width() // 2, back_rect.centery - txt.get_height() // 2))
 
 
     # --- LES PAGES ---
