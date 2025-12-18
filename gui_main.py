@@ -192,8 +192,8 @@ class MobaGui:
                     self.setup_manager.team_name,
                     self.setup_manager.coach_name,
                     self.setup_manager.selected_color,
+                    self.setup_manager.specialization,
                     prestige=70,
-                    budget=1_000_000,
                 )
                 self.team_blue.logo_shape = self.setup_manager.selected_shape
                 self.team_blue.specialization = self.setup_manager.specialization
