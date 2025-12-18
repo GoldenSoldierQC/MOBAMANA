@@ -1,0 +1,51 @@
+..E..E.E.
+======================================================================
+ERROR: test_league (__main__.TestMobaManager.test_league)
+Test league season execution
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\GoldenSoldierQC\.gemini\antigravity\scratch\esports_manager\test_all.py", line 135, in test_league
+    league.run_season()
+    ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\GoldenSoldierQC\.gemini\antigravity\scratch\esports_manager\moba_manager.py", line 579, in run_season
+    self._update_result(team_blue, team_red)
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'League' object has no attribute '_update_result'
+
+======================================================================
+ERROR: test_playoffs (__main__.TestMobaManager.test_playoffs)
+Test playoffs logic
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\GoldenSoldierQC\.gemini\antigravity\scratch\esports_manager\test_all.py", line 193, in test_playoffs
+    champion_name = league.run_playoffs()
+                    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'League' object has no attribute 'run_playoffs'
+
+======================================================================
+ERROR: test_season_progression (__main__.TestMobaManager.test_season_progression)
+Test player evolution and season advancement
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\GoldenSoldierQC\.gemini\antigravity\scratch\esports_manager\test_all.py", line 159, in test_season_progression
+    league.advance_season()
+    ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'League' object has no attribute 'advance_season'
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.003s
+
+FAILED (errors=3)
+[XP] Player_855 a gagne 505 XP !
+[XP] Player_554 a gagne 505 XP !
+[XP] Player_711 a gagne 515 XP !
+[XP] Player_994 a gagne 500 XP !
+[XP] Player_464 a gagne 520 XP !
+[XP] Player_146 a gagne 210 XP !
+[XP] Player_951 a gagne 205 XP !
+[XP] Player_759 a gagne 200 XP !
+[XP] Player_958 a gagne 200 XP !
+[XP] Player_903 a gagne 200 XP !
+[XP] Rookie a gagne 500 XP !
+[XP] Rookie a gagne 600 XP !
+[LEVEL UP] Rookie est niveau 2 (+1 SNG)
