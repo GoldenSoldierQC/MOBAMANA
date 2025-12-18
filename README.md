@@ -85,11 +85,16 @@ python gui_main.py
 python test_all.py
 ```
 
-## � Sauvegardes
+## 💾 Sauvegardes
 
-La carrière est sauvegardée au format JSON. Si vous ne retrouvez pas vos fichiers, cherchez dans ce dossier de projet les fichiers `.json` créés après une sauvegarde (le nom exact dépend de la logique de sauvegarde).
+La sauvegarde est un fichier JSON.
 
-## �📊 Architecture Technique
+* **Nom par défaut** : `savegame.json`
+* **Emplacement** : créé dans le répertoire courant (généralement le dossier `MOBAMANA` si vous lancez les scripts depuis ce dossier)
+
+Si vous lancez le jeu depuis un autre dossier, le fichier sera créé à cet endroit.
+
+## 📊 Architecture Technique
 
 Le projet est structuré de manière modulaire :
 
