@@ -536,8 +536,8 @@ class MatchSimulator:
 
         self.ai_brain = {
             "prev_gold_diff": 0,
-            "current_strategy": "BALANCED",
-            "weights": {"AGGRO": 1.0, "DEF": 1.0, "BALANCED": 1.0}
+            "current_strategy": "DEF",
+            "weights": {"AGGRO": 1.0, "DEF": 1.0}
         }
 
     def set_strategies(self, blue_strat: Strategy, red_strat: Strategy):
@@ -652,49 +652,20 @@ class MatchSimulator:
 
 
     def update_ai_tactics(self):
-        """L'IA analyse le match et ajuste ses sliders (Équipe Rouge / Team B)."""
+        """L'IA apprend de sa dernière tactique et choisit la plus efficace (Équipe Rouge / Team B)."""
         self.evaluate_strategy()
 
-        gold_diff = self.gold_a - self.gold_b # Positif si le joueur mène
-        
-        # --- SCÉNARIO 1 : L'IA EST MENÉE (CATCH-UP) ---
-        if gold_diff > 3000:
-            # Elle prend des risques pour revenir
-            self.red_tactics["aggro"] = 1.4
-            self.red_tactics["focus"] = 0.8
+        w_aggro = float(self.ai_brain["weights"].get("AGGRO", 1.0))
+        w_def = float(self.ai_brain["weights"].get("DEF", 1.0))
+
+        if w_aggro > w_def:
+            self.red_tactics = {"aggro": 1.4, "focus": 0.7}
             self.ai_brain["current_strategy"] = "AGGRO"
-            self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA passe en mode AGRESSIF !"})
-
-        # --- SCÉNARIO 2 : LE JOUEUR EST TROP AGRESSIF (PUNITION) ---
-        elif self.blue_tactics["aggro"] > 1.3:
-            # L'IA joue la montre et attend l'erreur
-            self.red_tactics["aggro"] = 0.7
-            self.red_tactics["focus"] = 1.3
-            self.ai_brain["current_strategy"] = "DEF"
-            self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA resserre sa defense."})
-
-        # --- SCÉNARIO 3 : L'IA MÈNE (SNOWBALL) ---
-        elif gold_diff < -2000:
-            # Elle sécurise les objectifs pour finir proprement
-            self.red_tactics["aggro"] = 1.0
-            self.red_tactics["focus"] = 1.4
-            self.ai_brain["current_strategy"] = "DEF"
-            self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA sécurise les objectifs."})
-
+            self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA choisit AGGRO."})
         else:
-            # --- SCÉNARIO 4 : RÉACTION À LA COMPOSITION ADVERSE ---
-            # Si l'équipe bleue a plus d'un assassin, l'IA joue plus safe (Défense)
-            blue_assassins = [c for c in self.blue_picks.values() if c.archetype == HeroArchetype.ASSASSIN]
-            if len(blue_assassins) >= 1:
-                self.red_tactics["aggro"] = 0.8
-                self.red_tactics["focus"] = 1.1
-                self.ai_brain["current_strategy"] = "DEF"
-                # On ne log pas à chaque fois pour ne pas spammer, seulement si changement
-                if random.random() < 0.2: # Log occasionnel
-                     self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA se mefie des assassins."})
-            else:
-                chosen = self.choose_ai_strategy()
-                self.apply_ai_strategy(chosen)
+            self.red_tactics = {"aggro": 0.7, "focus": 1.4}
+            self.ai_brain["current_strategy"] = "DEF"
+            self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA choisit DEF."})
 
     def evaluate_strategy(self):
         current_diff = self.gold_b - self.gold_a
@@ -711,31 +682,6 @@ class MatchSimulator:
 
         self.ai_brain["weights"][strat] = max(0.1, self.ai_brain["weights"][strat])
         self.ai_brain["prev_gold_diff"] = current_diff
-
-    def choose_ai_strategy(self) -> str:
-        weights = self.ai_brain.get("weights", {})
-        w_aggro = float(weights.get("AGGRO", 1.0))
-        w_def = float(weights.get("DEF", 1.0))
-        return "AGGRO" if w_aggro > w_def else "DEF"
-
-    def apply_ai_strategy(self, strategy_name: str):
-        self.ai_brain["current_strategy"] = strategy_name
-
-        if strategy_name == "AGGRO":
-            self.red_tactics["aggro"] = 1.4
-            self.red_tactics["focus"] = 0.7
-            self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA (RL) tente AGGRO."})
-            return
-
-        if strategy_name == "DEF":
-            self.red_tactics["aggro"] = 0.7
-            self.red_tactics["focus"] = 1.4
-            self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA (RL) tente DEF."})
-            return
-
-        self.red_tactics["aggro"] = 1.0
-        self.red_tactics["focus"] = 1.0
-        self.logs.append({"type": "TACTIC", "team": "B", "minute": self.current_minute, "msg": "L'IA (RL) reste BALANCED."})
 
     def get_mvp(self):
         """Calcule le MVP basé sur le score de performance (KDA + Impact)."""

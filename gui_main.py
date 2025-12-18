@@ -1,7 +1,7 @@
 import pygame
 import sys
 import math
-from moba_manager import Team, Role, CalibrationTools, MatchSimulator, create_initial_roster, load_game
+from moba_manager import Team, Role, CalibrationTools, MatchSimulator, create_initial_roster, load_game, save_game
 from gui_match import MatchDashboard
 from gui_market import MarketManager
 
@@ -56,6 +56,10 @@ class MobaGui:
 
         self.menu_buttons = {}
         self.settings_buttons = {}
+        self.home_buttons = {}
+
+        self.toast_msg = ""
+        self.toast_until_ms = 0
 
         # --- CONNEXION AU BACKEND ---
         # Création d'équipes de démonstration
@@ -134,6 +138,10 @@ class MobaGui:
             
             # Navigation
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_F5:
+                    self._quick_save()
+                elif event.key == pygame.K_F9:
+                    self._quick_load(keep_state=True)
                 if event.key == pygame.K_h:
                     self.current_state = STATE_HOME
                 elif event.key == pygame.K_r:
@@ -166,6 +174,10 @@ class MobaGui:
                     print(f"Nouveau joueur recruté : {new_player.name}")
                     # On l'ajoute directement à la réserve
                     self.team_blue.bench.append(new_player)
+
+            if self.current_state == STATE_HOME:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self._handle_home_click(event.pos)
 
 
 
@@ -233,11 +245,13 @@ class MobaGui:
 
         if self.current_state == STATE_MAIN_MENU:
             self.draw_main_menu()
+            self._draw_fps_overlay()
             pygame.display.flip()
             return
 
         if self.current_state == STATE_SETTINGS:
             self.draw_settings()
+            self._draw_fps_overlay()
             pygame.display.flip()
             return
         
@@ -254,7 +268,42 @@ class MobaGui:
         elif self.current_state == STATE_SETUP:
             self.setup_manager.draw()
             
+        self._draw_fps_overlay()
+        self._draw_toast()
         pygame.display.flip()
+
+    def _draw_fps_overlay(self):
+        if not self.settings.get("show_fps", False):
+            return
+        fps = self.clock.get_fps()
+        surf = self.small_font.render(f"FPS: {fps:.0f}", True, (200, 200, 200))
+        self.screen.blit(surf, (10, 10))
+
+    def _draw_toast(self):
+        if not self.toast_msg:
+            return
+        if pygame.time.get_ticks() > self.toast_until_ms:
+            self.toast_msg = ""
+            return
+        surf = self.small_font.render(self.toast_msg, True, (240, 240, 240))
+        pad_x = 10
+        pad_y = 6
+        rect = pygame.Rect(0, 0, surf.get_width() + pad_x * 2, surf.get_height() + pad_y * 2)
+        rect.midbottom = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 10)
+        pygame.draw.rect(self.screen, (10, 10, 15), rect, border_radius=8)
+        pygame.draw.rect(self.screen, (60, 60, 75), rect, width=1, border_radius=8)
+        self.screen.blit(surf, (rect.x + pad_x, rect.y + pad_y))
+
+    def _handle_home_click(self, pos):
+        for key, rect in self.home_buttons.items():
+            if not rect.collidepoint(pos):
+                continue
+            if key == "save":
+                self._quick_save()
+                return
+            if key == "load":
+                self._quick_load(keep_state=True)
+                return
 
     def _set_setup_state(self):
         from gui_setup import ProfileSetup
@@ -281,6 +330,42 @@ class MobaGui:
         self.match_dashboard.RED = self.team_red.team_color
         return True
 
+    def _set_toast(self, msg: str, duration_ms: int = 2000):
+        self.toast_msg = msg
+        self.toast_until_ms = pygame.time.get_ticks() + duration_ms
+
+    def _quick_save(self):
+        try:
+            save_game(self.league, "savegame.json")
+            self._set_toast("Sauvegarde OK")
+        except Exception:
+            self._set_toast("Erreur sauvegarde")
+
+    def _quick_load(self, keep_state: bool = True):
+        previous_state = self.current_state
+        league = None
+        try:
+            league = load_game("savegame.json")
+        except Exception:
+            league = None
+
+        if not league:
+            self._set_toast("Aucune sauvegarde")
+            return
+
+        if not self._apply_loaded_league(league):
+            self._set_toast("Erreur chargement")
+            return
+
+        self._set_toast("Chargement OK")
+        if keep_state:
+            if previous_state in {STATE_MAIN_MENU, STATE_SETTINGS, STATE_SETUP}:
+                self.current_state = STATE_HOME
+            else:
+                self.current_state = previous_state
+        else:
+            self.current_state = STATE_HOME
+
     def _handle_main_menu_click(self, pos):
         for key, rect in self.menu_buttons.items():
             if not rect.collidepoint(pos):
@@ -289,10 +374,7 @@ class MobaGui:
                 self._set_setup_state()
                 return
             if key == "load":
-                league = load_game("savegame.json")
-                if league:
-                    if self._apply_loaded_league(league):
-                        self.current_state = STATE_HOME
+                self._quick_load(keep_state=False)
                 return
             if key == "settings":
                 self.current_state = STATE_SETTINGS
@@ -412,6 +494,23 @@ class MobaGui:
         for i, text in enumerate(instr):
             surf = self.text_font.render(text, True, (200, 200, 200))
             self.screen.blit(surf, (100, 400 + (i * 40)))
+
+        self.home_buttons = {}
+        btn_w = 240
+        btn_h = 44
+        btn_y = 250
+        save_rect = pygame.Rect(SCREEN_WIDTH - btn_w - 60, btn_y, btn_w, btn_h)
+        load_rect = pygame.Rect(SCREEN_WIDTH - btn_w - 60, btn_y + btn_h + 12, btn_w, btn_h)
+        self.home_buttons["save"] = save_rect
+        self.home_buttons["load"] = load_rect
+
+        for label, rect in (("Sauvegarder", save_rect), ("Charger", load_rect)):
+            is_hover = rect.collidepoint(pygame.mouse.get_pos())
+            bg = (45, 45, 60) if not is_hover else (60, 60, 80)
+            pygame.draw.rect(self.screen, bg, rect, border_radius=10)
+            pygame.draw.rect(self.screen, (90, 90, 110), rect, width=2, border_radius=10)
+            txt = self.small_font.render(label, True, WHITE)
+            self.screen.blit(txt, (rect.centerx - txt.get_width() // 2, rect.centery - txt.get_height() // 2))
             
         if self.draft_manager.current_step >= 10:
              tip = self.text_font.render("Draft prête ! Appuyez sur ESPACE pour lancer le match", True, (255, 255, 100))
