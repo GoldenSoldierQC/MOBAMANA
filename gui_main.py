@@ -1,12 +1,14 @@
 import pygame
 import sys
 import math
+import random
 from moba_manager import Team, Role, CalibrationTools, MatchSimulator, create_initial_roster, load_game, save_game
 from gui_match import MatchDashboard
 from gui_market import MarketManager
 
 from gui_draft import DraftManager
 from gui_setup import draw_team_logo
+from gui_email import EmailGUI
 
 # --- CONSTANTES ---
 SCREEN_WIDTH = 1280
@@ -29,6 +31,7 @@ STATE_MARKET = "market"
 STATE_SETUP = "setup"
 STATE_MAIN_MENU = "main_menu"
 STATE_SETTINGS = "settings"
+STATE_EMAIL = "email"
 
 
 class MobaGui:
@@ -86,6 +89,9 @@ class MobaGui:
         # Initialisation du MarketManager
         self.market_manager = MarketManager(self.screen, self.league.market, self.team_blue.finance, self.draw_radar_chart)
         
+        # Gestionnaire d'emails
+        self.email_gui = None
+        
         self.team_name = self.team_blue.name
         self.budget = self.team_blue.budget
         self.current_year = 2025
@@ -98,8 +104,6 @@ class MobaGui:
         self.selected_starter_role = None
         self.selected_bench_idx = None
         self.roster_view_mode = "starters" # "starters" ou "bench"
-
-
 
     def run(self):
         """La boucle principale du jeu (The Game Loop)"""
@@ -150,6 +154,14 @@ class MobaGui:
                     self.current_state = STATE_DRAFT
                 elif event.key == pygame.K_m:
                     self.current_state = STATE_MARKET
+                elif event.key == pygame.K_e:  # Touche E pour ouvrir les emails
+                    if hasattr(self, 'league') and self.league.email_manager:
+                        self.current_state = STATE_EMAIL
+                        self.email_gui = EmailGUI(
+                            self.screen,
+                            self.league.email_manager,
+                            on_back=lambda: setattr(self, 'current_state', STATE_HOME)
+                        )
                 elif event.key == pygame.K_SPACE:
                     if self.current_state == STATE_MATCH and self.match_simulator.is_finished:
                         self.current_state = STATE_HOME
@@ -174,14 +186,13 @@ class MobaGui:
                     print(f"Nouveau joueur recruté : {new_player.name}")
                     # On l'ajoute directement à la réserve
                     self.team_blue.bench.append(new_player)
+            elif self.current_state == STATE_EMAIL and self.email_gui:
+                if self.email_gui.handle_event(event):
+                    continue  # L'événement a été traité
 
             if self.current_state == STATE_HOME:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     self._handle_home_click(event.pos)
-
-
-
-
 
     def update(self):
         if self.current_state in {STATE_MAIN_MENU, STATE_SETTINGS}:
@@ -252,7 +263,18 @@ class MobaGui:
                             print("FAILLITE ! Votre budget est épuisé.")
                             # On pourrait ajouter un écran de Game Over ici
 
-
+        # Mise à jour du marché (pour les animations, etc.)
+        if self.current_state == STATE_MARKET and self.market_manager:
+            self.market_manager.update()
+        
+        # Vérifier les nouveaux emails
+        if hasattr(self, 'league') and hasattr(self.league, 'email_manager'):
+            # 25% de chance d'avoir un nouvel email chaque frame (à ajuster selon les besoins)
+            if random.random() < 0.0025:  # Environ une fois toutes les 400 frames à 60 FPS
+                self.league.email_manager.trigger_random_event()
+                # Mettre à jour l'interface si on est sur l'onglet emails
+                if hasattr(self, 'email_gui'):
+                    self.email_gui.update_choice_buttons()
 
     def draw(self):
         self.screen.fill(BG_DARK)
@@ -279,6 +301,8 @@ class MobaGui:
             self.draft_manager.draw()
         elif self.current_state == STATE_MARKET:
             self.market_manager.draw()
+        elif self.current_state == STATE_EMAIL and self.email_gui:
+            self.email_gui.draw()
         elif self.current_state == STATE_SETUP:
             self.setup_manager.draw()
             

@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 import math
 import random
 import json
+from email_manager import EmailManager, EmailEvent
 
 # ============================================================================
 # 1. CONFIGURATION ET ÉQUILIBRAGE (GameBalance)
@@ -927,6 +928,7 @@ class League:
         self.market = TransferMarket()
         self.standings = {team.name: {"wins": 0, "losses": 0} for team in teams}
         self.calendar = []
+        self.email_manager = EmailManager(self)  # Gestionnaire d'emails
 
     def create_round_robin_schedule(self):
         """Génère un calendrier où chaque équipe affronte toutes les autres"""
@@ -958,52 +960,209 @@ class League:
 
     def distribute_rewards(self, match: 'MatchSimulator'):
         """Distribue l'XP aux joueurs à la fin d'un match."""
-        distribute_match_rewards(match)
+        # XP de base pour tous les participants
+        base_xp = 100
+        
+        # Bonus pour le MVP
+        mvp = match.get_mvp()
+        if mvp:
+            mvp.gain_xp(base_xp * 2)  # Double XP pour le MVP
+            
+        # XP pour tous les joueurs de l'équipe gagnante
+        winner_team = match.blue if match.scores["blue"] > match.scores["red"] else match.red
+        for player in winner_team.players:
+            if player != mvp:  # On évite de donner deux fois l'XP au MVP
+                player.gain_xp(int(base_xp * 1.5))  # 50% de bonus pour l'équipe gagnante
+        
+        # XP pour les perdants
+        loser_team = match.red if match.scores["blue"] > match.scores["red"] else match.blue
+        for player in loser_team.players:
+            player.gain_xp(int(base_xp * 0.75))  # 25% de moins pour les perdants
 
     def process_week(self):
         """Calcule les revenus et dépenses pour toutes les équipes de la ligue."""
-        print("\n🗓️  Fin de semaine : Traitement des finances...")
         for team in self.teams:
-            team.finance.process_weekly_expenses(team.all_players)
-            
-            # Événements aléatoires (20% de chance par équipe)
-            if random.random() < 0.2:
-                self._trigger_random_event(team)
+            if hasattr(team, 'finance') and team.finance:
+                team.finance.process_weekly_expenses(team.all_players())
+                
+                # 30% de chance d'un événement aléatoire par semaine
+                if random.random() < 0.3:
+                    self._trigger_random_event(team)
+                
+                # 25% de chance d'un email aléatoire pour l'équipe du joueur
+                if team == self.teams[0] and random.random() < 0.25:
+                    self.email_manager.trigger_random_event()
                 
             if team.finance.budget <= 0:
                 print(f"⚠️  ALERTE : {team.name} est en difficulté financière ! (Solde : {team.finance.budget}$)")
 
     def _trigger_random_event(self, team: Team):
         """Déclenche un événement aléatoire impactant une équipe."""
-        events = [
-            ("SPONSOR_BONUS", "Un sponsor local offre un bonus !", lambda t: t.finance.__setattr__('budget', t.finance.budget + 5000)),
-            ("INTENSIVE_TRAINING", "Entraînement intensif : l'équipe gagne de l'XP !", self._event_xp_boost),
-            ("SICKNESS", "Un joueur de l'équipe est tombé malade...", self._event_sickness),
-            ("GEAR_UPGRADE", "Nouveau matériel gaming ! Boost de motivation.", self._event_motivation_boost)
-        ]
-        
-        evt_type, msg, effect = random.choice(events)
-        print(f"🎲 ÉVÉNEMENT [{team.name}] : {msg}")
-        effect(team)
+        event_type = random.choice([
+            self._event_xp_boost,
+            self._event_sickness,
+            self._event_motivation_boost,
+            self._event_sponsor_offer,
+            self._event_tournament_invite
+        ])
+        event_type(team)
 
     def _event_xp_boost(self, team: Team):
-        for p in team.all_players:
+        """Donne un bonus d'XP à toute l'équipe."""
+        for p in team.all_players():
             p.gain_xp(150)
+        print("   > Toute l'équipe gagne +150 XP !")
 
     def _event_sickness(self, team: Team):
-        # Un joueur au hasard perd temporairement un peu de stats (ici on simplifie en baisse permanente pour le proto)
-        players = team.all_players
+        """Un joueur au hasard perd temporairement des stats."""
+        players = team.all_players()
         if players:
             p = random.choice(players)
             stat = random.choice(["mec", "mac", "vis", "sng"])
             old_val = getattr(p, stat)
             setattr(p, stat, max(40, old_val - 5))
-            print(f"   > {p.name} est affaibli (-5 en {stat.upper()})")
+            print(f"   > {p.name} est malade (-5 en {stat.upper()})")
+            
+            # Créer un email pour informer le joueur
+            if team == self.teams[0]:  # Seulement pour l'équipe du joueur
+                event = EmailEvent(
+                    id=f"SICKNESS_{p.name.upper()}_{random.randint(1000,9999)}",
+                    sender="Médecin de l'équipe",
+                    subject=f"{p.name} est malade",
+                    body=(
+                        f"{p.name} a attrapé un virus avant le prochain match.\n"
+                        f"Ses performances seront réduites de 5 points en {stat.upper()}.\n\n"
+                        "Il devrait se rétablir d'ici quelques jours..."
+                    ),
+                    choices={"OK": lambda: None}
+                )
+                self.email_manager.push_event(event)
 
     def _event_motivation_boost(self, team: Team):
-        for p in team.all_players:
+        """Augmente le sang-froid de toute l'équipe."""
+        for p in team.all_players():
             p.sng = min(100, p.sng + 3)
         print("   > Toute l'équipe gagne +3 en SNG (Sang-froid)")
+        
+        # Notification par email pour l'équipe du joueur
+        if team == self.teams[0]:
+            event = EmailEvent(
+                id=f"MOTIVATION_BOOST_{random.randint(1000,9999)}",
+                sender="Coach en chef",
+                subject="Séance de team building réussie !",
+                body=("L'ambiance dans l'équipe n'a jamais été aussi bonne !\n"
+                     "Tous les joueurs gagnent +3 en Sang-froid (SNG)."),
+                choices={"GÉNIAL !": lambda: None}
+            )
+            self.email_manager.push_event(event)
+
+    def _event_sponsor_offer(self, team: Team):
+        """Un sponsor propose une offre commerciale à l'équipe."""
+        if team != self.teams[0]:  # Seulement pour l'IA
+            if random.random() < 0.7:  # 70% de chance d'accepter
+                team.finance.budget += random.randint(10000, 50000)
+        else:
+            # Pour le joueur, on crée un email
+            amount = random.randint(20000, 100000)
+            penalty = random.randint(2, 10)
+            
+            event = EmailEvent(
+                id=f"SPONSOR_{random.randint(1000,9999)}",
+                sender=random.choice([
+                    "NexusTech",
+                    "Dragon Energy",
+                    "EliteGaming Gear",
+                    "BlueBuff Beverages"
+                ]),
+                subject="Offre de partenariat exclusif",
+                body=(
+                    f"Nous souhaitons devenir votre sponsor principal !\n\n"
+                    f"• +{amount}$ immédiat\n"
+                    f"• -{penalty} de prestige en cas de défaite ce mois-ci"
+                ),
+                choices={
+                    "SIGNER": lambda: self._apply_sponsor_deal(team, amount, penalty),
+                    "REFUSER": lambda: None
+                }
+            )
+            self.email_manager.push_event(event)
+
+    def _event_tournament_invite(self, team: Team):
+        """Invitation à un tournoi avec récompense en cas de victoire."""
+        if team != self.teams[0]:  # Seulement pour le joueur
+            return
+            
+        prize = random.randint(50000, 200000)
+        risk = random.randint(5, 15)  # Perte de prestige en cas d'échec
+        
+        event = EmailEvent(
+            id=f"TOURNAMENT_{random.randint(1000,9999)}",
+            sender=random.choice([
+                "Championnat International",
+                "Ligue des Étoiles",
+                "Coupe des Titans"
+            ]),
+            subject="Invitation à un tournoi prestigieux",
+            body=(
+                "Votre équipe est invitée à participer à notre tournoi !\n\n"
+                f"• 1er prix: {prize}$\n"
+                f"• -{risk} de prestige si élimination précoce"
+            ),
+            choices={
+                "ACCEPTER": lambda: self._enter_tournament(team, prize, risk),
+                "DÉCLINER": lambda: None
+            }
+        )
+        self.email_manager.push_event(event)
+
+    def _apply_sponsor_deal(self, team: Team, amount: int, penalty: int):
+        """Applique les effets d'un contrat de sponsor."""
+        team.finance.budget += amount
+        # On stocke la pénalité pour le prochain match perdu
+        original_handle_loss = getattr(team, '_original_handle_loss', None)
+        
+        if not original_handle_loss:
+            # On sauvegarde la méthode originale si ce n'est pas déjà fait
+            team._original_handle_loss = team.handle_loss if hasattr(team, 'handle_loss') else None
+            
+            # On la remplace par notre version personnalisée
+            def handle_loss_with_penalty(self, *args, **kwargs):
+                self.prestige = max(0, self.prestige - penalty)
+                # On restaure la méthode originale après utilisation
+                if hasattr(self, '_original_handle_loss'):
+                    self.handle_loss = self._original_handle_loss
+                    del self._original_handle_loss
+            
+            team.handle_loss = handle_loss_with_penalty.__get__(team, Team)
+
+    def _enter_tournament(self, team: Team, prize: int, risk: int):
+        """Fait participer l'équipe à un tournoi avec un risque de perdre du prestige."""
+        # 40% de chances de gagner le tournoi
+        if random.random() < 0.4:
+            team.finance.budget += prize
+            # Créer un email de victoire
+            event = EmailEvent(
+                id=f"TOURNAMENT_WIN_{random.randint(1000,9999)}",
+                sender="Administration du Tournoi",
+                subject="Félicitations !",
+                body=f"Votre équipe a remporté le tournoi !\n\n+{prize}$ ajoutés à votre budget.",
+                choices={"GÉNIAL !": lambda: None}
+            )
+        else:
+            team.prestige = max(0, team.prestige - risk)
+            # Créer un email de défaite
+            event = EmailEvent(
+                id=f"TOURNAMENT_LOSS_{random.randint(1000,9999)}",
+                sender="Administration du Tournoi",
+                subject="Fin de parcours...",
+                body=(
+                    "Votre équipe a été éliminée plus tôt que prévu.\n\n"
+                    f"-{risk} points de prestige.\n"
+                    "Merci pour votre participation !"
+                ),
+                choices={"DOMMAGE...": lambda: None}
+            )
+        self.email_manager.push_event(event)
 
 
     def _update_result(self, winner: Team, loser: Team):
