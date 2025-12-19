@@ -464,33 +464,35 @@ def create_initial_roster(team_name: str, coach_name: str, color: tuple, special
 
 
 def generate_league_teams(exclude_name: str, count: int = 7) -> List['Team']:
-    """
-    Génère des équipes rivales aléatoires avec des niveaux variés.
+    """Génère des équipes rivales avec des noms réels et des niveaux variés."""
+    rival_pool = [
+        ("Fnatic", 82, (255, 152, 0)),        # Orange
+        ("Cloud9", 80, (0, 174, 243)),       # Bleu ciel
+        ("T1", 95, (226, 0, 52)),            # Rouge Coréen
+        ("Gen.G", 93, (170, 140, 0)),        # Or
+        ("Vitality", 78, (255, 255, 0)),     # Jaune
+        ("Karmine Corp", 75, (0, 71, 171)),  # Bleu royal
+        ("Team Liquid", 85, (10, 30, 60)),   # Bleu Marine
+        ("FlyQuest", 72, (0, 100, 50))       # Vert
+    ]
     
-    Args:
-        exclude_name: Nom d'équipe à exclure (pour éviter les doublons)
-        count: Nombre d'équipes à générer (max 8 par défaut)
-        
-    Returns:
-        List[Team]: Liste des équipes générées
-    """
-    rival_names = ["Fnatic", "Team Liquid", "Cloud9", "Gen.G", "DRX", "Vitality", "FlyQuest", "Bilibili Gaming"]
     teams = []
+    random.shuffle(rival_pool)  # Pour ne pas avoir toujours les mêmes si on limite le nombre
     
-    for i in range(min(count, len(rival_names))):
-        name = rival_names[i]
+    for i in range(min(count, len(rival_pool))):
+        name, prestige, color = rival_pool[i]
         if name == exclude_name: 
             continue  # Évite les doublons
         
-        # On définit un tier pour l'équipe (Aléatoire)
-        tier = random.choice(["pro", "pro", "elite", "rookie"])
+        # On définit un "style" de recrutement pour l'IA rivale
+        # (Elite pour les grosses écuries, Pro/Rookie pour les petites)
+        tier = "elite" if prestige > 85 else "pro" if prestige > 75 else "rookie"
         
-        # Création de l'équipe avec des valeurs aléatoires
-        color = (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200))
+        # Création de l'équipe avec les paramètres définis
         t = Team(
-            name, 
-            prestige=random.randint(60, 95), 
-            budget=random.randint(300000, 1500000), 
+            name=name,
+            prestige=prestige,
+            budget=random.randint(500000, 2000000),
             team_color=color
         )
         
