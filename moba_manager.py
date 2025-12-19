@@ -463,6 +463,44 @@ def create_initial_roster(team_name: str, coach_name: str, color: tuple, special
     return new_team
 
 
+def generate_league_teams(exclude_name: str, count: int = 7) -> List['Team']:
+    """
+    Génère des équipes rivales aléatoires avec des niveaux variés.
+    
+    Args:
+        exclude_name: Nom d'équipe à exclure (pour éviter les doublons)
+        count: Nombre d'équipes à générer (max 8 par défaut)
+        
+    Returns:
+        List[Team]: Liste des équipes générées
+    """
+    rival_names = ["Fnatic", "Team Liquid", "Cloud9", "Gen.G", "DRX", "Vitality", "FlyQuest", "Bilibili Gaming"]
+    teams = []
+    
+    for i in range(min(count, len(rival_names))):
+        name = rival_names[i]
+        if name == exclude_name: 
+            continue  # Évite les doublons
+        
+        # On définit un tier pour l'équipe (Aléatoire)
+        tier = random.choice(["pro", "pro", "elite", "rookie"])
+        
+        # Création de l'équipe avec des valeurs aléatoires
+        color = (random.randint(50, 200), random.randint(50, 200), random.randint(50, 200))
+        t = Team(
+            name, 
+            prestige=random.randint(60, 95), 
+            budget=random.randint(300000, 1500000), 
+            team_color=color
+        )
+        
+        # Remplissage du roster selon le tier choisi
+        for role in Role:
+            t.roster[role] = CalibrationTools.generate_player(role, tier)
+            
+        teams.append(t)
+    return teams
+
 
 # ============================================================================
 # 5. MARCHÉ DES TRANSFERTS (TransferMarket)

@@ -31,12 +31,20 @@ class ProfileSetup:
         self.shapes = ["Cercle", "Carré", "Diamant"]
         self.shape_idx = 0
         self.selected_shape = "Cercle"
+        
+        # Starter Packs
+        from moba_manager import STARTER_KITS
+        self.starter_packs = list(STARTER_KITS.keys())
+        self.pack_idx = 0
+        self.selected_pack = self.starter_packs[0]
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_BACKSPACE:
-                if self.active_field == "coach": self.coach_name = self.coach_name[:-1]
-                else: self.team_name = self.team_name[:-1]
+                if self.active_field == "coach":
+                    self.coach_name = self.coach_name[:-1]
+                else:
+                    self.team_name = self.team_name[:-1]
             elif event.key == pygame.K_TAB:
                 self.active_field = "team" if self.active_field == "coach" else "coach"
             elif event.key == pygame.K_RETURN:
@@ -70,9 +78,16 @@ class ProfileSetup:
                 if rect.collidepoint(mouse_pos):
                     self.shape_idx = i
                     self.selected_shape = shape
+                    
+            # Sélection du pack de départ
+            for i, pack in enumerate(self.starter_packs):
+                rect = pygame.Rect(400 + (i * 200), 720, 190, 50)
+                if rect.collidepoint(mouse_pos):
+                    self.pack_idx = i
+                    self.selected_pack = pack
             
             # Bouton de validation
-            btn_rect = pygame.Rect(540, 640, 200, 50)
+            btn_rect = pygame.Rect(540, 800, 200, 50)
             if btn_rect.collidepoint(mouse_pos):
                 if self.coach_name and self.team_name:
                     self.done = True
@@ -97,19 +112,22 @@ class ProfileSetup:
         # Sélecteur de forme
         self._draw_logo_picker(610)
         
+        # Sélecteur de pack de départ
+        self._draw_pack_picker(700)
+        
         # Aperçu du Logo
         self._draw_logo_preview(950, 200)
 
         # Bouton Valider
         btn_color = (41, 128, 185) if (self.coach_name and self.team_name) else (50, 50, 50)
-        btn_rect = pygame.Rect(540, 750, 200, 50)
+        btn_rect = pygame.Rect(540, 800, 200, 50)
         pygame.draw.rect(self.screen, btn_color, btn_rect, border_radius=10)
         btn_txt = self.font_text.render("CONFIRMER", True, (255, 255, 255))
         self.screen.blit(btn_txt, (btn_rect.centerx - btn_txt.get_width()//2, btn_rect.centery - btn_txt.get_height()//2))
         
         if not (self.coach_name and self.team_name):
             hint = self.font_small.render("Veuillez remplir tous les champs", True, (150, 150, 150))
-            self.screen.blit(hint, (640 - hint.get_width()//2, 810))
+            self.screen.blit(hint, (640 - hint.get_width()//2, 860))
 
     def _draw_input_field(self, label, text, y, is_active):
         color = (212, 175, 55) if is_active else (150, 150, 150)
@@ -163,6 +181,24 @@ class ProfileSetup:
             txt_color = (0, 0, 0) if is_sel else (150, 150, 150)
             txt_surf = self.font_small.render(shape, True, txt_color)
             self.screen.blit(txt_surf, (rect.centerx - txt_surf.get_width()//2, rect.centery - txt_surf.get_height()//2))
+
+    def _draw_pack_picker(self, y):
+        lbl = self.font_text.render("PACK DE DÉPART", True, (200, 200, 200))
+        self.screen.blit(lbl, (400, y - 30))
+        
+        for i, pack in enumerate(self.starter_packs):
+            rect = pygame.Rect(400 + (i * 200), y, 190, 50)
+            is_sel = (self.pack_idx == i)
+            color = (212, 175, 55) if is_sel else (40, 40, 50)
+            pygame.draw.rect(self.screen, color, rect, border_radius=5)
+            
+            txt_color = (0, 0, 0) if is_sel else (200, 200, 200)
+            pack_name = self.font_small.render(pack, True, txt_color)
+            from moba_manager import STARTER_KITS
+            pack_desc = self.font_small.render(STARTER_KITS[pack]["desc"], True, (150, 150, 150))
+            
+            self.screen.blit(pack_name, (rect.centerx - pack_name.get_width()//2, rect.y + 8))
+            self.screen.blit(pack_desc, (rect.centerx - pack_desc.get_width()//2, rect.y + 28))
 
     def _draw_logo_preview(self, x, y):
         pygame.draw.rect(self.screen, (20, 20, 30), (x - 60, y - 20, 120, 120), border_radius=10)
