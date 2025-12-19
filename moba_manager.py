@@ -5,6 +5,8 @@ import math
 import random
 import json
 from email_manager import EmailManager, EmailEvent
+import pygame
+import sys
 
 # ============================================================================
 # 1. CONFIGURATION ET ÉQUILIBRAGE (GameBalance)
@@ -200,6 +202,7 @@ class Team:
     roster: Dict[Role, Optional['Player']] = field(default_factory=lambda: {role: None for role in Role})
     bench: List['Player'] = field(default_factory=list)
     stats: TeamStats = field(default_factory=TeamStats)
+    handle_loss_penalty: int = 0 # Pénalité de prestige en cas de défaite (sponsor)
     finance: Optional[FinanceManager] = field(default=None, init=False)
 
     def __post_init__(self):
@@ -225,7 +228,7 @@ class Team:
         """Retourne l'intégralité du roster incluant le banc (pour salaires)."""
         return self.starters + self.bench
 
-    def swap_players(self, role: Role, bench_idx: int):
+    def swap_players(self, role: Role, bench_idx: int) -> bool:
         """Échange un titulaire d'un poste spécifique avec un joueur du banc."""
         if not isinstance(role, Role):
             print(f"[ERROR] Rôle invalide fourni : {role}")
@@ -982,8 +985,8 @@ class League:
     def process_week(self):
         """Calcule les revenus et dépenses pour toutes les équipes de la ligue."""
         for team in self.teams:
-            if hasattr(team, 'finance') and team.finance:
-                team.finance.process_weekly_expenses(team.all_players())
+            if team.finance:
+                team.finance.process_weekly_expenses(team.all_players)
                 
                 # 30% de chance d'un événement aléatoire par semaine
                 if random.random() < 0.3:
@@ -1009,13 +1012,13 @@ class League:
 
     def _event_xp_boost(self, team: Team):
         """Donne un bonus d'XP à toute l'équipe."""
-        for p in team.all_players():
+        for p in team.all_players:
             p.gain_xp(150)
         print("   > Toute l'équipe gagne +150 XP !")
 
     def _event_sickness(self, team: Team):
         """Un joueur au hasard perd temporairement des stats."""
-        players = team.all_players()
+        players = team.all_players
         if players:
             p = random.choice(players)
             stat = random.choice(["mec", "mac", "vis", "sng"])
@@ -1040,7 +1043,7 @@ class League:
 
     def _event_motivation_boost(self, team: Team):
         """Augmente le sang-froid de toute l'équipe."""
-        for p in team.all_players():
+        for p in team.all_players:
             p.sng = min(100, p.sng + 3)
         print("   > Toute l'équipe gagne +3 en SNG (Sang-froid)")
         
@@ -1118,22 +1121,7 @@ class League:
     def _apply_sponsor_deal(self, team: Team, amount: int, penalty: int):
         """Applique les effets d'un contrat de sponsor."""
         team.finance.budget += amount
-        # On stocke la pénalité pour le prochain match perdu
-        original_handle_loss = getattr(team, '_original_handle_loss', None)
-        
-        if not original_handle_loss:
-            # On sauvegarde la méthode originale si ce n'est pas déjà fait
-            team._original_handle_loss = team.handle_loss if hasattr(team, 'handle_loss') else None
-            
-            # On la remplace par notre version personnalisée
-            def handle_loss_with_penalty(self, *args, **kwargs):
-                self.prestige = max(0, self.prestige - penalty)
-                # On restaure la méthode originale après utilisation
-                if hasattr(self, '_original_handle_loss'):
-                    self.handle_loss = self._original_handle_loss
-                    del self._original_handle_loss
-            
-            team.handle_loss = handle_loss_with_penalty.__get__(team, Team)
+        team.handle_loss_penalty = penalty
 
     def _enter_tournament(self, team: Team, prize: int, risk: int):
         """Fait participer l'équipe à un tournoi avec un risque de perdre du prestige."""
@@ -1169,6 +1157,13 @@ class League:
         """Met à jour les objets Team et le classement de la Ligue"""
         winner.stats.wins += 1
         loser.stats.losses += 1
+
+        # Appliquer la pénalité de sponsor si elle existe
+        if loser.handle_loss_penalty > 0:
+            loser.prestige = max(0, loser.prestige - loser.handle_loss_penalty)
+            print(f"Sponsor mécontent ! {loser.name} perd {loser.handle_loss_penalty} points de prestige.")
+            loser.handle_loss_penalty = 0 # La pénalité ne s'applique qu'une fois
+
         self.standings[winner.name]["wins"] += 1
         self.standings[loser.name]["losses"] += 1
 
@@ -1345,10 +1340,15 @@ def load_game(filename="savegame.json") -> Optional[League]:
     except FileNotFoundError:
         print("\n❌ Aucun fichier de sauvegarde trouvé.")
         return None
+    raise FileNotFoundError(f"Le fichier de sauvegarde '{filename}' est introuvable.")
 
 # ============================================================================
 # 8. BOUCLE DE JEU (Game Loop)
 # ============================================================================
+
+# --- Configuration Pygame ---
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+
 def game_loop():
     print("=== WELCOME TO MOBA TEAM MANAGER 2025 ===")
     
@@ -1389,6 +1389,30 @@ def game_loop():
 
     print(f"\nFélicitations ! Vous êtes le nouveau manager de {user_team.name}.")
 
+    # --- Initialisation de Pygame ---
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("MOBA Team Manager 2025")
+    font = pygame.font.Font(None, 36)
+    title_font = pygame.font.Font(None, 50)
+    
+    # Couleurs
+    BG_COLOR = (20, 20, 40)
+    TEXT_COLOR = (230, 230, 230)
+    BUTTON_COLOR = (40, 40, 60)
+    BUTTON_HOVER_COLOR = (70, 70, 90)
+
+    menu_options = {
+        "1": "Roster", "2": "Marché", "3": "Saison", "4": "Classement",
+        "5": "New Season", "6": "Sauvegarder", "7": "Charger", "0": "Quitter"
+    }
+    
+    button_rects = {}
+    y_pos = 150
+    for key, text in menu_options.items():
+        button_rects[key] = pygame.Rect(250, y_pos, 300, 50)
+        y_pos += 60
+
     # 3. Boucle principale
     while True:
         print(f"\n--- {user_team.name} | Budget: {user_team.budget}€ ---")
@@ -1398,16 +1422,15 @@ def game_loop():
         act = input("\nChoix : ")
         
         if act == "1":
-            for role, p in user_team.roster.items():
-                rating = p.stats.get_overall_rating() if p else 0
-                print(f"{role.value}: {p.name if p else 'VIDE'} | Rating: {rating:.1f} | Age: {p.age if p else 'N/A'}")
+            for role, p in user_team.roster.items(): # type: ignore
+                print(f"{role.value}: {p.name if p else 'VIDE'} | Rating: {p.get_overall_rating():.1f} | Age: {p.age if p else 'N/A'}")
         
         elif act == "2":
             # Simulation rapide du marché
             print("\nJoueurs disponibles :")
             market_players = [CalibrationTools.generate_balanced_player(random.choice(list(Role)), "elite") for _ in range(3)]
             for i, p in enumerate(market_players):
-                print(f"[{i}] {p.name} ({p.role.value}) - Rating: {p.stats.get_overall_rating():.1f} | Prix: {p.market_value}€")
+                print(f"[{i}] {p.name} ({p.role.value}) - Rating: {p.get_overall_rating():.1f} | Prix: {p.market_value}€")
             
             buy_choice = input("\nAcheter un joueur (numéro) ou [Retour]: ")
             if buy_choice.isdigit():
@@ -1417,7 +1440,7 @@ def game_loop():
                     try:
                         offer_str = input(f"Votre offre pour {p_to_buy.name} (Valeur: {p_to_buy.market_value:,}€) : ")
                         if offer_str.isdigit():
-                            offer = int(offer_str)
+                            offer = int(offer_str) # type: ignore
                             if league.market.attempt_transfer(user_team, p_to_buy, offer):
                                 print("TRANSFERT RÉUSSI !")
                             else:
@@ -1428,6 +1451,7 @@ def game_loop():
                         print("Erreur lors de la saisie de l'offre.")
                 else:
                     print("Index de joueur invalide.")
+        mouse_pos = pygame.mouse.get_pos()
 
         elif act == "3":
             print("\nSimulation de la saison régulière...")
@@ -1444,31 +1468,108 @@ def game_loop():
             rankings = league.get_rankings()
             for name, stats in rankings:
                 print(f"{name}: {stats['wins']}V - {stats['losses']}D")
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for key, rect in button_rects.items():
+                    if rect.collidepoint(mouse_pos):
+                        act = key
+                        print(f"\nAction: {menu_options[act]}")
 
         elif act == "5":
             league.advance_season()
             print("\nLes joueurs ont vieilli. Les statistiques ont évolué.")
+                        if act == "1":
+                            for role, p in user_team.roster.items():
+                                print(f"{role.value}: {p.name if p else 'VIDE'} | Rating: {p.get_overall_rating():.1f} | Age: {p.age if p else 'N/A'}")
+                        
+                        elif act == "2":
+                            print("\nLe marché est actuellement géré via la console.")
+                            # La logique du marché reste en console pour l'instant
 
         elif act == "6":
             try:
                 save_game(league)
             except Exception as e:
                 print(f"Erreur lors de la sauvegarde : {e}")
+                        elif act == "3":
+                            print("\nSimulation de la saison régulière...")
+                            league.create_round_robin_schedule()
+                            league.run_season()
+                            print("Saison régulière terminée !")
+                            input("\nAppuyez sur Entrée pour lancer les PLAYOFFS...")
+                            league.run_playoffs()
 
         elif act == "7":
             try:
                 loaded_league = load_game()
                 if loaded_league:
                     league = loaded_league
-                    # Retrouver l'équipe de l'utilisateur dans la nouvelle liste
-                    for t in league.teams:
-                        if t.name == user_team.name:
-                            user_team = t
-            except Exception as e:
+                    # Retrouver l'objet 'user_team' dans la nouvelle instance de la ligue
+                    user_team_found = next((t for t in league.teams if t.name == user_team.name), None) # type: ignore
+                    if user_team_found:
+                        user_team = user_team_found
+            except FileNotFoundError:
+                # Le message est déjà géré dans load_game, on ne fait rien ici.
+                pass
+            except Exception as e: # type: ignore
                 print(f"Erreur lors du chargement : {e}")
+                        elif act == "4":
+                            print("\n=== CLASSEMENT ===")
+                            rankings = league.get_rankings()
+                            for name, stats in rankings:
+                                print(f"{name}: {stats['wins']}V - {stats['losses']}D")
 
         elif act == "0":
             break
+                        elif act == "5":
+                            league.advance_season()
+                            print("\nLes joueurs ont vieilli. Les statistiques ont évolué.")
+
+                        elif act == "6":
+                            save_game(league)
+
+                        elif act == "7.":
+                            try:
+                                loaded_league = load_game()
+                                if loaded_league:
+                                    league = loaded_league
+                                    user_team_found = next((t for t in league.teams if t.name == user_team.name), None)
+                                    if user_team_found:
+                                        user_team = user_team_found
+                            except FileNotFoundError:
+                                pass
+                            except Exception as e:
+                                print(f"Erreur lors du chargement : {e}")
+
+                        elif act == "0":
+                            pygame.quit()
+                            sys.exit()
+
+        # --- Dessin ---
+        screen.fill(BG_COLOR)
+
+        # Titre
+        title_text = title_font.render(f"Manager: {user_team.name}", True, TEXT_COLOR)
+        title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 50))
+        screen.blit(title_text, title_rect)
+
+        # Budget
+        budget_text = font.render(f"Budget: {user_team.current_budget:,}€", True, TEXT_COLOR)
+        budget_rect = budget_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
+        screen.blit(budget_text, budget_rect)
+
+        # Boutons
+        for key, rect in button_rects.items():
+            color = BUTTON_HOVER_COLOR if rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(screen, color, rect, border_radius=10)
+            text_surf = font.render(menu_options[key], True, TEXT_COLOR)
+            text_rect = text_surf.get_rect(center=rect.center)
+            screen.blit(text_surf, text_rect)
+
+        pygame.display.flip()
 
 def distribute_match_rewards(match: 'MatchSimulator'):
     """Fonction utilitaire pour distribuer l'XP à la fin d'un match."""
