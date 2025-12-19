@@ -2,12 +2,14 @@ import pygame
 import sys
 import math
 import random
-from moba_manager import Team, Role, CalibrationTools, MatchSimulator, create_initial_roster, load_game, save_game
+from moba_manager import (
+    Team, Role, CalibrationTools, MatchSimulator, create_initial_roster,
+    load_game, save_game, League, generate_league_teams, CHAMPIONS_DB
+)
 from gui_match import MatchDashboard
 from gui_market import MarketManager
-
 from gui_draft import DraftManager
-from gui_setup import draw_team_logo
+from gui_setup import draw_team_logo, ProfileSetup
 from gui_email import EmailGUI
 
 # --- CONSTANTES ---
@@ -49,8 +51,7 @@ class MobaGui:
         self.title_font = pygame.font.Font(None, 74)
         self.text_font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
-
-        from gui_setup import ProfileSetup
+        
         self.setup_manager = ProfileSetup(self.screen)
 
         self.settings = {
@@ -81,7 +82,7 @@ class MobaGui:
         self.match_dashboard = MatchDashboard(self.screen, self.match_simulator)
 
         # Initialisation de la Ligue (pour gérer les coûts hebdomadaires)
-        from moba_manager import League
+        # League is now imported at the top
         self.league = League("Worlds 2025", [self.team_blue, self.team_red])
         
         # Initialisation du DraftManager
@@ -90,7 +91,11 @@ class MobaGui:
         self.market_manager = MarketManager(self.screen, self.league.market, self.team_blue.finance, self.draw_radar_chart)
         
         # Gestionnaire d'emails
-        self.email_gui = None
+        self.email_gui = EmailGUI(
+            self.screen,
+            self.league.email_manager if hasattr(self.league, 'email_manager') else None,
+            on_back=lambda: setattr(self, 'current_state', STATE_HOME)
+        )
         
         self.team_name = self.team_blue.name
         self.budget = self.team_blue.budget
@@ -212,7 +217,7 @@ class MobaGui:
                 self.team_blue.specialization = self.setup_manager.specialization
                 
                 # 2. GÉNÉRER LA LIGUE (NOUVEAU)
-                from moba_manager import generate_league_teams, League
+                # generate_league_teams and League are now imported at the top
                 # On génère 7 rivaux (donc une ligue à 8 équipes au total)
                 rivals = generate_league_teams(exclude_name=self.team_blue.name, count=7)
                 all_teams = [self.team_blue] + rivals
@@ -344,7 +349,6 @@ class MobaGui:
                 return
 
     def _set_setup_state(self):
-        from gui_setup import ProfileSetup
         self.setup_manager = ProfileSetup(self.screen)
         self.current_state = STATE_SETUP
 
@@ -745,7 +749,7 @@ class MobaGui:
 
     def finalize_draft(self):
         """Transfère les choix de la draft vers les joueurs avant le match."""
-        from moba_manager import CHAMPIONS_DB
+        # CHAMPIONS_DB is now imported at the top
         
         picks_a = self.draft_manager.picks_a
         picks_b = self.draft_manager.picks_b

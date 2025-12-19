@@ -1,85 +1,87 @@
 import pygame
-from dataclasses import dataclass
-import textwrap
 
-@dataclass
-class EmailGUI:
-    """Interface graphique pour la gestion des emails."""
-    
-    def __init__(self, screen, email_manager, on_back):
+# Couleurs
+BG = (25, 25, 35)
+PANEL = (40, 40, 55)
+WHITE = (240, 240, 240)
+GOLD = (212, 175, 55)
+BTN = (60, 60, 80)
+BTN_HOVER = (80, 80, 110)
+
+class EmailScreen:
+    def __init__(self, screen, email_manager):
         self.screen = screen
-        self.email_manager = email_manager
-        self.on_back = on_back
-        self.font_small = pygame.font.Font(None, 24)
-        self.font_medium = pygame.font.Font(None, 28)
-        self.font_large = pygame.font.Font(None, 32)
-        self.selected_email = 0
-        self.scroll_offset = 0
-        self.button_font = pygame.font.Font(None, 26)
-        
-        # Couleurs
-        self.bg_color = (20, 20, 30)
-        self.panel_color = (30, 30, 45)
-        self.text_color = (230, 230, 240)
-        self.highlight_color = (65, 105, 225)  # Bleu royal
-        self.button_color = (50, 50, 70)
-        self.button_hover_color = (70, 70, 100)
-        
-        # Dimensions
-        self.width, self.height = screen.get_size()
-        self.list_width = 300
-        self.padding = 20
-        self.button_height = 40
-        
-        # Boutons de choix
-        self.choice_buttons = []
-        self.update_choice_buttons()
-    
+        self.manager = email_manager
+        self.font_title = pygame.font.Font(None, 48)
+        self.font_text = pygame.font.Font(None, 26)
+        self.font_small = pygame.font.Font(None, 22)
+        self.choice_buttons = {}
+
     def handle_event(self, event):
-        """Gère les événements de la souris et du clavier."""
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE or event.key == pygame.K_e:
-                self.on_back()
-                return True
-            elif event.key == pygame.K_UP:
-                self.selected_email = max(0, self.selected_email - 1)
-                self.ensure_email_visible()
-                return True
-            elif event.key == pygame.K_DOWN:
-                self.selected_email = min(len(self.email_manager.inbox) - 1, self.selected_email + 1)
-                self.ensure_email_visible()
-                return True
-            elif event.key == pygame.K_RETURN and self.email_manager.inbox:
-                self.handle_email_selection(self.selected_email)
-                return True
-        
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Clic gauche
-                mouse_pos = pygame.mouse.get_pos()
-                # Vérifier les clics sur la liste des emails
-                if 0 <= mouse_pos[0] < self.list_width:
-                    email_y = (mouse_pos[1] - self.padding + self.scroll_offset) // 50
-                    if 0 <= email_y < len(self.email_manager.inbox):
-                        self.selected_email = email_y
-                        self.ensure_email_visible()
-                        return True
-                
-                # Vérifier les clics sur les boutons de choix
-                for i, (rect, _, _) in enumerate(self.choice_buttons):
-                    if rect.collidepoint(mouse_pos):
-                        self.handle_choice_click(i)
-                        return True
-        
-        elif event.type == pygame.MOUSEMOTION:
-            # Mettre à jour l'état de survol des boutons
-            mouse_pos = pygame.mouse.get_pos()
-            for i, (rect, _, _) in enumerate(self.choice_buttons):
-                if rect.collidepoint(mouse_pos):
-                    self.choice_buttons[i] = (rect, self.button_hover_color, self.choice_buttons[i][2])
-                else:
-                    self.choice_buttons[i] = (rect, self.button_color, self.choice_buttons[i][2])
-        
-        return False
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for key, rect in self.choice_buttons.items():
+                if rect.collidepoint(event.pos):
+                    event_id, choice = key
+                    self.manager.resolve(event_id, choice)
+                    return "CLOSE"
+        return None
+
+    def draw(self):
+        self.screen.fill(BG)
+
+        email = None
+        if self.manager.inbox:  # Get the latest email
+            email = self.manager.inbox[-1]
+            
+        if not email:
+            txt = self.font_title.render("Aucun email", True, WHITE)
+            self.screen.blit(txt, (640 - txt.get_width() // 2, 360))
+            return
+
+        # Panel principal
+        panel = pygame.Rect(160, 80, 960, 560)
+        pygame.draw.rect(self.screen, PANEL, panel, border_radius=14)
+        pygame.draw.rect(self.screen, (90, 90, 110), panel, 2, border_radius=14)
+
+        # Header
+        sender = self.font_small.render(f"De : {email.sender}", True, GOLD)
+        subject = self.font_title.render(email.subject, True, WHITE)
+
+        self.screen.blit(sender, (panel.x + 30, panel.y + 20))
+        self.screen.blit(subject, (panel.x + 30, panel.y + 50))
+
+        # Corps
+        y = panel.y + 130
+        for line in email.body.split("\n"):
+            txt = self.font_text.render(line, True, WHITE)
+            self.screen.blit(txt, (panel.x + 30, y))
+            y += 30
+
+        # Boutons choix
+        self.choice_buttons.clear()
+        btn_y = panel.bottom - 90
+        btn_w = 260
+        gap = 30
+        start_x = panel.centerx - ((len(email.choices) * btn_w + (len(email.choices) - 1) * gap) // 2)
+
+        for i, choice in enumerate(email.choices.keys()):
+            rect = pygame.Rect(start_x + i * (btn_w + gap), btn_y, btn_w, 50)
+            self.choice_buttons[(email.id, choice)] = rect
+
+            hover = rect.collidepoint(pygame.mouse.get_pos())
+            color = BTN_HOVER if hover else BTN
+
+            pygame.draw.rect(self.screen, color, rect, border_radius=10)
+            pygame.draw.rect(self.screen, (120, 120, 150), rect, 2, border_radius=10)
+
+            txt = self.font_text.render(choice, True, WHITE)
+            self.screen.blit(
+                txt,
+                (rect.centerx - txt.get_width() // 2, rect.centery - txt.get_height() // 2)
+            )
+
+        hint = self.font_small.render("[ESC] Retour", True, (150, 150, 160))
+        self.screen.blit(hint, (20, 690))
     
     def update_choice_buttons(self):
         """Met à jour les boutons de choix en fonction de l'email sélectionné."""
@@ -125,7 +127,7 @@ class EmailGUI:
         elif self.selected_email >= self.scroll_offset + visible_emails:
             self.scroll_offset = max(0, self.selected_email - visible_emails + 1)
     
-    def draw(self):
+    def draw(self):  # noqa: F811
         """Dessine l'interface des emails."""
         # Fond
         self.screen.fill(self.bg_color)
@@ -200,7 +202,7 @@ class EmailGUI:
         y_pos += subject_text.get_height() + 20
         
         # Corps du message avec retour à la ligne automatique
-        wrapper = textwrap.TextWrapper(width=60)
+        wrapper = textwrap.TextWrapper(width=60)  # noqa: F821
         for line in email.body.split('\n'):
             wrapped_lines = wrapper.wrap(line) if line.strip() else ['']
             for wrapped_line in wrapped_lines:
