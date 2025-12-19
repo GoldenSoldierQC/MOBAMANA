@@ -7,6 +7,35 @@ from gui_setup import draw_team_logo
 
 WHITE = (255, 255, 255)
 
+class KillNotification:
+    def __init__(self, text, color, duration_ms=3000):
+        self.text = text
+        self.color = color
+        self.start_time = pygame.time.get_ticks()
+        self.duration = duration_ms
+        self.y_offset = -50
+
+    def is_expired(self):
+        return pygame.time.get_ticks() - self.start_time > self.duration
+
+    def draw(self, screen, font):
+        now = pygame.time.get_ticks()
+        elapsed = now - self.start_time
+        
+        if elapsed < 500:
+            self.y_offset = -50 + (elapsed / 500) * 120
+        elif elapsed > self.duration - 500:
+            self.y_offset = 70 - ((elapsed - (self.duration - 500)) / 500) * 120
+        else:
+            self.y_offset = 70
+
+        rect = pygame.Rect(440, self.y_offset, 400, 45)
+        pygame.draw.rect(screen, (20, 20, 30), rect, border_radius=10)
+        pygame.draw.rect(screen, self.color, rect, 2, border_radius=10)
+        
+        txt_surf = font.render(self.text, True, (255, 255, 255))
+        screen.blit(txt_surf, (rect.centerx - txt_surf.get_width()//2, rect.centery - txt_surf.get_height()//2))
+
 class EnhancedMinimap:
     def __init__(self, x, y, width, height):
         self.rect = pygame.Rect(x, y, width, height)
@@ -113,14 +142,35 @@ class EnhancedMinimap:
         current_time = pygame.time.get_ticks()
         self.map_events = [e for e in self.map_events if current_time - e[3] < 5000]
 
-    def draw(self, screen, team_a_players, team_b_players, color_a, color_b):
+    def draw(self, screen, team_a_players, team_b_players, color_a, color_b, momentum_ratio=0.0):
         pygame.draw.rect(screen, (20, 25, 35), self.rect, border_radius=10)
         pygame.draw.rect(screen, (60, 60, 70), self.rect, 2, border_radius=10)
 
+        # Dessiner la ligne de front (momentum visuel)
+        self._draw_front_line(screen, momentum_ratio)
+        
         self._draw_lanes(screen)
         self._draw_map_events(screen)
         self._draw_players(screen, team_a_players, color_a)
         self._draw_players(screen, team_b_players, color_b)
+
+    def _draw_front_line(self, screen, ratio):
+        """Dessine une ombre colorée représentant le contrôle du terrain."""
+        # ratio: -1 (Rouge domine) à 1 (Bleu domine)
+        center_x = self.rect.centerx + (ratio * (self.rect.width // 2))
+        
+        # Zone Bleue (Influence gauche/bas)
+        blue_surf = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(blue_surf, (41, 128, 185, 40), (0, 0, center_x - self.rect.x, self.rect.height))
+        screen.blit(blue_surf, self.rect.topleft)
+        
+        # Zone Rouge (Influence droite/haut)
+        red_surf = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(red_surf, (192, 57, 43, 40), (center_x - self.rect.x, 0, self.rect.right - center_x, self.rect.height))
+        screen.blit(red_surf, self.rect.topleft)
+
+        # La ligne de démarcation
+        pygame.draw.line(screen, (255, 255, 255, 100), (center_x, self.rect.y), (center_x, self.rect.bottom), 2)
 
     def _draw_lanes(self, screen):
         inset = 10
@@ -286,23 +336,66 @@ class MatchDashboard:
 
         self.minimap = EnhancedMinimap(320, 80, 650, 300)
         self._last_minimap_log_idx = 0
+        
+        # Gestionnaire de notifications de kill
+        self.kill_notifications = []
+
+    def add_kill_notification(self, killer_name, victim_name, team_color):
+        """Ajoute une notification de kill avec animation"""
+        text = f"{killer_name} a éliminé {victim_name} !"
+        notification = KillNotification(text, team_color)
+        self.kill_notifications.append(notification)
+
+    def update_notifications(self):
+        """Met à jour et nettoie les notifications expirées"""
+        self.kill_notifications = [n for n in self.kill_notifications if not n.is_expired()]
 
     def update(self):
         """Fait progresser le match selon la vitesse choisie."""
         if not self.engine.is_finished and not self.is_paused:
             for _ in range(self.speed):
                 if not self.engine.is_finished:
+                    # Sauvegarder les kills avant la simulation
+                    old_kills_a = self.engine.kills_a
+                    old_kills_b = self.engine.kills_b
+                    
                     self.engine.simulate_step()
                     self._record_history_if_needed()
 
                     self._sync_minimap_events()
+                    
+                    # Détecter les nouveaux kills et créer des notifications
+                    if self.engine.kills_a > old_kills_a:
+                        # Trouver le dernier événement de kill bleu
+                        for log in reversed(self.engine.logs):
+                            if log["type"] == "KILL" and log["team"] == "A":
+                                # Extraire les noms du message
+                                msg = log["msg"]
+                                if "a elimine" in msg:
+                                    parts = msg.split(" a elimine ")
+                                    minute_str = f"[{log['minute']}]"
+                                    killer_name = parts[0].replace(minute_str, "").strip()
+                                    victim_name = parts[1].replace(" !", "").strip()
+                                    self.add_kill_notification(killer_name, victim_name, self.BLUE)
+                                break
+                    
+                    if self.engine.kills_b > old_kills_b:
+                        # Trouver le dernier événement de kill rouge
+                        for log in reversed(self.engine.logs):
+                            if log["type"] == "KILL" and log["team"] == "B":
+                                # Extraire les noms du message
+                                msg = log["msg"]
+                                if "a elimine" in msg:
+                                    parts = msg.split(" a elimine ")
+                                    minute_str = f"[{log['minute']}]"
+                                    killer_name = parts[0].replace(minute_str, "").strip()
+                                    victim_name = parts[1].replace(" !", "").strip()
+                                    self.add_kill_notification(killer_name, victim_name, self.RED)
+                                break
 
-                    game_phase = self._get_current_phase()
-                    for p in self.engine.team_a.players:
-                        self.minimap.update_player_action(p, "A", game_phase, self.engine.current_minute)
-                    for p in self.engine.team_b.players:
-                        self.minimap.update_player_action(p, "B", game_phase, self.engine.current_minute)
-
+        # Mettre à jour les notifications
+        self.update_notifications()
+        
         self.minimap.interpolate_positions()
 
     def _sync_minimap_events(self):
@@ -412,12 +505,23 @@ class MatchDashboard:
 
     def draw(self):
         self.draw_top_bar()
+        
+        # Dessiner les bannières de kill (avant les autres éléments)
+        for notification in self.kill_notifications:
+            notification.draw(self.screen, self.font_main)
+        
+        # Calcul du momentum ratio basé sur l'écart d'or
+        gold_diff = self.engine.gold_a - self.engine.gold_b
+        # On sature à +/- 5000 gold pour le visuel
+        momentum_ratio = max(-1.0, min(1.0, gold_diff / 5000.0))
+        
         self.minimap.draw(
             self.screen,
             self.engine.team_a.players,
             self.engine.team_b.players,
             self.BLUE,
             self.RED,
+            momentum_ratio  # Ajout du momentum ratio
         )
         self.draw_sidebars()
         self.draw_timeline()
