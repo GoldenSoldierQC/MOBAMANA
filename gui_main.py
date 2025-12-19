@@ -188,27 +188,40 @@ class MobaGui:
             return
         if self.current_state == STATE_SETUP:
             if self.setup_manager.done:
+                # 1. Créer ton équipe avec le Starter Kit choisi
                 self.team_blue = create_initial_roster(
                     self.setup_manager.team_name,
                     self.setup_manager.coach_name,
                     self.setup_manager.selected_color,
                     specialization=self.setup_manager.specialization,
                     prestige=70,
-                    kit_name=self.setup_manager.selected_pack
+                    kit_name = getattr(self.setup_manager, "selected_pack", "LA PÉPITE")
                 )
                 self.team_blue.logo_shape = self.setup_manager.selected_shape
                 self.team_blue.specialization = self.setup_manager.specialization
+                
+                # 2. GÉNÉRER LA LIGUE (NOUVEAU)
+                from moba_manager import generate_league_teams, League
+                # On génère 7 rivaux (donc une ligue à 8 équipes au total)
+                rivals = generate_league_teams(exclude_name=self.team_blue.name, count=7)
+                all_teams = [self.team_blue] + rivals
+                
+                # 3. Initialiser la saison avec tout ce beau monde
+                self.league = League("Saison Pro 2025", all_teams)
                 self.team_name = self.team_blue.name
-
-                from moba_manager import League
-                self.league = League("Worlds 2025", [self.team_blue, self.team_red])
+                
+                # 4. Préparer le marché et le premier adversaire pour l'affichage
                 self.market_manager = MarketManager(self.screen, self.league.market, self.team_blue.finance, self.draw_radar_chart)
-
+                
+                # On définit arbitrairement le premier rival de la liste comme l'adversaire par défaut pour le HUD
+                self.team_red = rivals[0] 
                 self.match_simulator = MatchSimulator(self.team_blue, self.team_red)
                 self.match_dashboard = MatchDashboard(self.screen, self.match_simulator)
 
+                # Synchronisation visuelle
                 self.draft_manager.color_a = self.team_blue.team_color
                 self.match_dashboard.BLUE = self.team_blue.team_color
+                self.match_dashboard.RED = self.team_red.team_color
 
                 self.current_state = STATE_HOME
         elif self.current_state == STATE_DRAFT:
