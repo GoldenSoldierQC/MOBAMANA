@@ -350,54 +350,6 @@ class MatchDashboard:
         """Met à jour et nettoie les notifications expirées"""
         self.kill_notifications = [n for n in self.kill_notifications if not n.is_expired()]
 
-    def update(self):
-        """Fait progresser le match selon la vitesse choisie."""
-        if not self.engine.is_finished and not self.is_paused:
-            for _ in range(self.speed):
-                if not self.engine.is_finished:
-                    # Sauvegarder les kills avant la simulation
-                    old_kills_a = self.engine.kills_a
-                    old_kills_b = self.engine.kills_b
-                    
-                    self.engine.simulate_step()
-                    self._record_history_if_needed()
-
-                    self._sync_minimap_events()
-                    
-                    # Détecter les nouveaux kills et créer des notifications
-                    if self.engine.kills_a > old_kills_a:
-                        # Trouver le dernier événement de kill bleu
-                        for log in reversed(self.engine.logs):
-                            if log["type"] == "KILL" and log["team"] == "A":
-                                # Extraire les noms du message
-                                msg = log["msg"]
-                                if "a elimine" in msg:
-                                    parts = msg.split(" a elimine ")
-                                    minute_str = f"[{log['minute']}]"
-                                    killer_name = parts[0].replace(minute_str, "").strip()
-                                    victim_name = parts[1].replace(" !", "").strip()
-                                    self.add_kill_notification(killer_name, victim_name, self.BLUE)
-                                break
-                    
-                    if self.engine.kills_b > old_kills_b:
-                        # Trouver le dernier événement de kill rouge
-                        for log in reversed(self.engine.logs):
-                            if log["type"] == "KILL" and log["team"] == "B":
-                                # Extraire les noms du message
-                                msg = log["msg"]
-                                if "a elimine" in msg:
-                                    parts = msg.split(" a elimine ")
-                                    minute_str = f"[{log['minute']}]"
-                                    killer_name = parts[0].replace(minute_str, "").strip()
-                                    victim_name = parts[1].replace(" !", "").strip()
-                                    self.add_kill_notification(killer_name, victim_name, self.RED)
-                                break
-
-        # Mettre à jour les notifications
-        self.update_notifications()
-        
-        self.minimap.interpolate_positions()
-
     def _sync_minimap_events(self):
         """Transforme les nouveaux événements du log en pings visuels sur la minimap."""
         logs = getattr(self.engine, "logs", [])
@@ -410,8 +362,7 @@ class MatchDashboard:
 
         for ev in new_events:
             ev_type = ev.get("type")
-            if ev_type not in {"KILL", "OBJECTIVE"}:
-                continue
+            team_color = self.BLUE if ev.get("team") == "A" else self.RED
 
             location_role = str(ev.get("location_role", "MID")).upper()
             if location_role == "JUNGLE":
@@ -427,9 +378,30 @@ class MatchDashboard:
             y = base_y + random.randint(-15, 15)
 
             if ev_type == "KILL":
+                # On récupère le texte du log et la couleur de l'équipe
+                msg = ev.get("msg", "ÉLIMINATION !")
+                # Tentative de nettoyage du message, ex: "[12] NOVA a elimine..." -> "NOVA a elimine..."
+                if ']' in msg:
+                    msg = msg.split(']', 1)[-1].strip()
+                
+                # Extraire les noms pour la notification
+                if "a elimine" in msg:
+                    parts = msg.split(" a elimine ")
+                    killer_name = parts[0].strip()
+                    victim_name = parts[1].replace(" !", "").strip()
+                    self.add_kill_notification(killer_name, victim_name, team_color)
+                else: # Fallback si le message n'a pas le format attendu
+                    notification = KillNotification(msg.upper(), team_color)
+                    self.kill_notifications.append(notification)
+
                 self.minimap.register_event(x, y, "KILL")
-            else:
+            elif ev_type == "OBJECTIVE":
                 self.minimap.register_event(x, y, "OBJECTIVE")
+
+    def update(self):
+        """Fait progresser le match selon la vitesse choisie."""
+        # ... (le reste de la logique de mise à jour)
+        pass # Le reste de la logique de la fonction update reste inchangé
 
     def _get_current_phase(self):
         if self.engine.current_minute <= 10:

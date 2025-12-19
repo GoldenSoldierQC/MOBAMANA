@@ -1,16 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Optional
-import sys
 import math
 import random
 import json
-
-try:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-except Exception:
-    pass
 
 # ============================================================================
 # 1. CONFIGURATION ET ÉQUILIBRAGE (GameBalance)
@@ -45,6 +38,22 @@ class GameBalance:
     POINTS_TOWER = 2
     POINTS_BARON = 5
     POINTS_ELDER = 8
+
+STARTER_KITS = {
+    "LA PÉPITE": {
+        "desc": "Un prodige au MID (Elite), mais le reste est très jeune.",
+        "distribution": {Role.MID: "Elite", Role.TOP: "Rookie", Role.JUNGLE: "Rookie", Role.ADC: "Rookie", Role.SUPPORT: "Rookie"}
+    },
+    "LE MUR": {
+        "desc": "Une défense solide (Pro) sur le TOP et le SUPPORT.",
+        "distribution": {Role.TOP: "Pro", Role.SUPPORT: "Pro", Role.MID: "Rookie", Role.JUNGLE: "Rookie", Role.ADC: "Rookie"}
+    },
+    "OFFENSIF": {
+        "desc": "Une paire agressive (Pro) en JUNGLE et ADC.",
+        "distribution": {Role.JUNGLE: "Pro", Role.ADC: "Pro", Role.TOP: "Rookie", Role.MID: "Rookie", Role.SUPPORT: "Rookie"}
+    }
+}
+
 
 # ============================================================================
 # 2. MODÈLES DE DONNÉES (Entities)
@@ -394,83 +403,6 @@ class CalibrationTools:
         return player
 
 
-def create_initial_roster(team_name: str, coach_name: str, color: tuple, specialization: str = "Polyvalent", prestige: int = 70, budget: int = None) -> 'Team':
-    """
-    Crée une équipe initiale avec un Starter Pack adapté à la spécialisation du coach.
-    
-    Args:
-        team_name: Nom de l'équipe
-        coach_name: Nom du coach
-        color: Couleur de l'équipe
-        specialization: Spécialisation du coach (Polyvalent, Analyste, Motivateur, Scout, Entraîneur)
-        prestige: Prestige initial de l'équipe
-        budget: Budget initial (calculé automatiquement selon la spécialisation si None)
-    
-    Returns:
-        Team: L'équipe créée avec son roster initial
-    """
-    # Budget de base selon la spécialisation
-    specialization_budgets = {
-        "Polyvalent": 1_000_000,
-        "Analyste": 900_000,      # Moins de budget mais meilleure stratégie
-        "Motivateur": 950_000,    # Budget moyen avec bonus de performance
-        "Scout": 1_100_000,       # Plus de budget pour trouver des talents
-        "Entraîneur": 850_000     # Moins de budget mais meilleur développement
-    }
-    
-    if budget is None:
-        budget = specialization_budgets.get(specialization, 1_000_000)
-    
-    new_team = Team(team_name, prestige=prestige, budget=budget, coach_name=coach_name, team_color=color, specialization=specialization)
-    new_team.roster = {role: None for role in Role}
-    
-    # Génération du roster selon la spécialisation
-    if specialization == "Polyvalent":
-        # Équipe équilibrée : 1 Pro, 2 Elite, 2 Rookie
-        new_team.roster[Role.MID] = CalibrationTools.generate_player(Role.MID, "Elite")
-        new_team.roster[Role.TOP] = CalibrationTools.generate_player(Role.TOP, "Pro")
-        new_team.roster[Role.JUNGLE] = CalibrationTools.generate_player(Role.JUNGLE, "Pro")
-        new_team.roster[Role.ADC] = CalibrationTools.generate_player(Role.ADC, "Rookie")
-        new_team.roster[Role.SUPPORT] = CalibrationTools.generate_player(Role.SUPPORT, "Rookie")
-        
-    elif specialization == "Analyste":
-        # Focus sur la macro et stratégie : joueurs avec vision élevée
-        new_team.roster[Role.MID] = CalibrationTools.generate_player(Role.MID, "Elite")
-        new_team.roster[Role.JUNGLE] = CalibrationTools.generate_player(Role.JUNGLE, "Elite")
-        new_team.roster[Role.TOP] = CalibrationTools.generate_player(Role.TOP, "Pro")
-        new_team.roster[Role.ADC] = CalibrationTools.generate_player(Role.ADC, "Pro")
-        new_team.roster[Role.SUPPORT] = CalibrationTools.generate_player(Role.SUPPORT, "Rookie")
-        
-    elif specialization == "Motivateur":
-        # Focus sur le moral et la performance en clutch : joueurs avec sang-froid élevé
-        new_team.roster[Role.MID] = CalibrationTools.generate_player(Role.MID, "Pro")
-        new_team.roster[Role.ADC] = CalibrationTools.generate_player(Role.ADC, "Elite")
-        new_team.roster[Role.SUPPORT] = CalibrationTools.generate_player(Role.SUPPORT, "Elite")
-        new_team.roster[Role.TOP] = CalibrationTools.generate_player(Role.TOP, "Pro")
-        new_team.roster[Role.JUNGLE] = CalibrationTools.generate_player(Role.JUNGLE, "Rookie")
-        
-    elif specialization == "Scout":
-        # Focus sur la détection de talents : mix équilibré avec potentiel
-        new_team.roster[Role.MID] = CalibrationTools.generate_player(Role.MID, "Pro")
-        new_team.roster[Role.TOP] = CalibrationTools.generate_player(Role.TOP, "Pro")
-        new_team.roster[Role.JUNGLE] = CalibrationTools.generate_player(Role.JUNGLE, "Rookie")
-        new_team.roster[Role.ADC] = CalibrationTools.generate_player(Role.ADC, "Rookie")
-        new_team.roster[Role.SUPPORT] = CalibrationTools.generate_player(Role.SUPPORT, "Rookie")
-        
-    elif specialization == "Entraîneur":
-        # Focus sur le développement : jeunes joueurs avec un vétéran
-        new_team.roster[Role.MID] = CalibrationTools.generate_player(Role.MID, "Pro")
-        new_team.roster[Role.TOP] = CalibrationTools.generate_player(Role.TOP, "Pro")
-        new_team.roster[Role.JUNGLE] = CalibrationTools.generate_player(Role.JUNGLE, "Rookie")
-        new_team.roster[Role.ADC] = CalibrationTools.generate_player(Role.ADC, "Rookie")
-        new_team.roster[Role.SUPPORT] = CalibrationTools.generate_player(Role.SUPPORT, "Rookie")
-    
-    # Ajustement des stats selon la spécialisation
-    _apply_specialization_bonuses(new_team, specialization)
-    
-    return new_team
-
-
 def _apply_specialization_bonuses(team: 'Team', specialization: str):
     """
     Applique des bonus de statistiques selon la spécialisation du coach.
@@ -491,6 +423,44 @@ def _apply_specialization_bonuses(team: 'Team', specialization: str):
                 current_value = getattr(player, stat)
                 setattr(player, stat, min(99, current_value + bonus))
 
+
+def create_initial_roster(team_name: str, coach_name: str, color: tuple, specialization: str = "Polyvalent", prestige: int = 70, budget: int = None, kit_name: str = "LA PÉPITE") -> 'Team':
+    """
+    Crée une équipe initiale avec un Starter Pack.
+    
+    Args:
+        team_name: Nom de l'équipe
+        coach_name: Nom du coach
+        color: Couleur de l'équipe
+        specialization: Spécialisation du coach (pour les bonus)
+        prestige: Prestige initial
+        budget: Budget initial
+        kit_name: Nom du Starter Kit à utiliser
+    
+    Returns:
+        Team: L'équipe créée avec son roster initial
+    """
+    specialization_budgets = {
+        "Polyvalent": 1_000_000, "Analyste": 900_000, "Motivateur": 950_000,
+        "Scout": 1_100_000, "Entraîneur": 850_000
+    }
+    
+    if budget is None:
+        budget = specialization_budgets.get(specialization, 1_000_000)
+    
+    new_team = Team(team_name, prestige=prestige, budget=budget, coach_name=coach_name, team_color=color, specialization=specialization)
+    
+    # Utilisation du Starter Kit pour générer le roster
+    kit = STARTER_KITS.get(kit_name, STARTER_KITS["LA PÉPITE"])
+    distribution = kit["distribution"]
+    
+    for role, tier in distribution.items():
+        new_team.roster[role] = CalibrationTools.generate_player(role, tier)
+    
+    # Application des bonus de spécialisation du coach
+    _apply_specialization_bonuses(new_team, specialization)
+    
+    return new_team
 
 
 
@@ -1320,4 +1290,3 @@ def distribute_match_rewards(match: 'MatchSimulator'):
 
 if __name__ == "__main__":
     game_loop()
-
