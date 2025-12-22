@@ -1507,10 +1507,7 @@ def game_loop():
                     if rect.collidepoint(mouse_pos):
                         act = key
                         print(f"\nAction: {menu_options[act]}")
-                        # Traiter immédiatement l'action du bouton
-                        if act in ["0", "1", "2", "3", "4", "5", "6", "7"]:
-                            break  # Sortir de la boucle pour traiter l'action dans la boucle principale
-                continue  # Passer à l'itération suivante de la boucle principale
+                        break  # Sortir de la boucle des boutons et traiter l'action
 
         # --- Dessin ---
         screen.fill(BG_COLOR)
@@ -1521,7 +1518,7 @@ def game_loop():
         screen.blit(title_text, title_rect)
 
         # Budget
-        budget_text = font.render(f"Budget: {user_team.budget:,}€", True, TEXT_COLOR)
+        budget_text = font.render(f"Budget: {user_team.current_budget:,}€", True, TEXT_COLOR)
         budget_rect = budget_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
         screen.blit(budget_text, budget_rect)
 
