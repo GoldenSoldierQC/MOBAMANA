@@ -12,6 +12,7 @@ from .objectives import Objective, ObjectiveManager
 from .tactics import CombatTactics, CombatAction, TargetType, CombatDecision
 from .humanizer import Humanizer, StressLevel
 from .profiles import TeamProfile, TeamStyle, get_profile, TEAM_PROFILES
+from .email_manager import EmailManager, EmailEvent
 
 # Version du module
 __version__ = "0.1.0"
@@ -45,4 +46,6 @@ __all__ = [
     'TeamStyle',
     'get_profile',
     'TEAM_PROFILES',
+    'EmailManager',
+    'EmailEvent',
 ]

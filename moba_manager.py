@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 import math
 import random
 import json
-from AI.email_manager import EmailManager, EmailEvent
+from AI import EmailManager, EmailEvent
 import pygame
 import sys
 
