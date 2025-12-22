@@ -17,10 +17,11 @@ class Humanizer:
     """
     
     def __init__(self):
+        """Initialise le humanizer avec des valeurs par défaut."""
         self.stress_level: StressLevel = StressLevel.NORMAL
         self.last_action_time: Dict[str, float] = {}
         self.action_history: list = []
-        self.reaction_times: Dict[str, list] = {
+        self.reaction_times: Dict[str, float] = {
             'min': 0.15,  # Temps de réaction humain minimum (secondes)
             'max': 0.5    # Temps de réaction humain maximum (secondes)
         }
@@ -31,33 +32,68 @@ class Humanizer:
             'reaction_time': 1.0,    # Facteur multiplicateur du temps de réaction
             'decision_quality': 1.0   # Qualité des décisions (1.0 = parfaite)
         }
+        
+        # Valeurs par défaut pour la validation
+        self._min_click_accuracy = 0.0
+        self._max_click_accuracy = 1.0
     
-    def update_stress(self, game_state: dict):
+    def update_stress(self, game_state: dict, silent: bool = False) -> None:
         """
         Met à jour le niveau de stress en fonction de l'état du jeu.
         
         Args:
-            game_state: État actuel du jeu
+            game_state: Dictionnaire contenant l'état du jeu avec les clés :
+                       - 'nearby_enemies': nombre d'ennemis proches (int)
+                       - 'health_percent': pourcentage de vie (float entre 0.0 et 1.0)
+            silent: Si True, n'affiche pas les messages d'erreur
+        
+        Raises:
+            ValueError: Si les valeurs dans game_state sont invalides
         """
-        # Exemple simple : augmenter le stress en fonction des ennemis proches
-        nearby_enemies = game_state.get('nearby_enemies', 0)
-        health_percent = game_state.get('health_percent', 1.0)
-        
-        if health_percent < 0.3 or nearby_enemies > 2:
-            self.stress_level = StressLevel.PANIC
-        elif health_percent < 0.6 or nearby_enemies > 0:
-            self.stress_level = StressLevel.PRESSURED
-        else:
-            self.stress_level = StressLevel.NORMAL
-        
-        # Mettre à jour les facteurs d'erreur en fonction du stress
+        try:
+            # Validation des entrées
+            nearby_enemies = int(game_state.get('nearby_enemies', 0))
+            health_percent = float(game_state.get('health_percent', 1.0))
+            
+            if not 0 <= health_percent <= 1.0:
+                error_msg = "health_percent doit être entre 0.0 et 1.0"
+                if not silent:
+                    print(f"Erreur lors de la mise à jour du stress : {error_msg}")
+                raise ValueError(error_msg)
+                
+            if nearby_enemies < 0:
+                error_msg = "nearby_enemies ne peut pas être négatif"
+                if not silent:
+                    print(f"Erreur lors de la mise à jour du stress : {error_msg}")
+                raise ValueError(error_msg)
+            
+            # Mise à jour du niveau de stress
+            if health_percent < 0.3 or nearby_enemies > 2:
+                self.stress_level = StressLevel.PANIC
+            elif health_percent < 0.6 or nearby_enemies > 0:
+                self.stress_level = StressLevel.PRESSURED
+            elif health_percent > 0.9 and nearby_enemies == 0:
+                self.stress_level = StressLevel.CALM
+            else:
+                self.stress_level = StressLevel.NORMAL
+            
+            # Mise à jour des facteurs d'erreur
+            self._update_error_factors()
+            
+        except (TypeError, ValueError) as e:
+            # En cas d'erreur, on garde le niveau de stress actuel
+            if not silent:
+                print(f"Erreur lors de la mise à jour du stress : {e}")
+            raise ValueError(f"Format de game_state invalide : {e}")
+    
+    def _update_error_factors(self) -> None:
+        """Met à jour les facteurs d'erreur en fonction du niveau de stress actuel."""
         stress_value = self.stress_level.value
         self.error_factors = {
-            'click_accuracy': max(0.7, 1.0 - (stress_value * 0.3)),
-            'reaction_time': 1.0 + stress_value,
-            'decision_quality': 1.0 - (stress_value * 0.5)
+            'click_accuracy': max(0.0, min(1.0, 1.0 - (stress_value * 0.3))),
+            'reaction_time': max(0.1, 1.0 + stress_value),
+            'decision_quality': max(0.1, 1.0 - (stress_value * 0.5))
         }
-    
     def humanize_decision(self, decision: CombatDecision) -> CombatDecision:
         """
         Ajoute des imperfections humaines à une décision de combat.
@@ -68,13 +104,17 @@ class Humanizer:
         Returns:
             Décision modifiée avec des imperfections
         """
+        # Create a copy to avoid mutating the input
+        from copy import copy
+        modified_decision = copy(decision)
+        
         if random.random() > self.error_factors['decision_quality']:
             # Prendre une mauvaise décision occasionnellement
-            if decision.action == CombatAction.ATTACK and random.random() > 0.5:
-                decision.action = CombatAction.RETREAT
-                decision.confidence *= 0.5
-        
-        return decision
+            if modified_decision.action == CombatAction.ATTACK and random.random() > 0.5:
+                modified_decision.action = CombatAction.RETREAT
+                modified_decision.confidence *= 0.5
+
+        return modified_decision
     
     def humanize_click_position(self, position: Tuple[float, float]) -> Tuple[float, float]:
         """
@@ -85,14 +125,29 @@ class Humanizer:
             
         Returns:
             Nouvelle position avec une légère variation
+            
+        Raises:
+            ValueError: Si la position contient des valeurs non numériques
         """
-        accuracy = self.error_factors['click_accuracy']
-        x, y = position
-        
-        # Ajouter un décalage aléatoire basé sur la précision
-        max_offset = 10 * (1.0 - accuracy)  # Jusqu'à 10 pixels de décalage
-        x += random.uniform(-max_offset, max_offset)
-        y += random.uniform(-max_offset, max_offset)
+        try:
+            x, y = map(float, position)
+            accuracy = self.error_factors['click_accuracy']
+            
+            # Validation de la précision
+            if not 0 <= accuracy <= 1.0:
+                accuracy = 0.5  # Valeur par défaut en cas d'erreur
+                
+            # Calcul du décalage maximal (entre 0 et 10 pixels)
+            max_offset = 10 * (1.0 - accuracy)
+            
+            # Application du décalage aléatoire
+            x_offset = random.uniform(-max_offset, max_offset)
+            y_offset = random.uniform(-max_offset, max_offset)
+            
+            return (x + x_offset, y + y_offset)
+            
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Position invalide : {position}. Erreur : {e}")
         
         return (x, y)
     

@@ -1449,9 +1449,10 @@ def game_loop():
                             print("Montant invalide.")
                     except ValueError:
                         print("Erreur lors de la saisie de l'offre.")
-                else:
+                else: # type: ignore
                     print("Index de joueur invalide.")
         mouse_pos = pygame.mouse.get_pos()
+ act_from_gui = None # This line was causing the error, it should be part of the if/elif chain or removed.
 
         elif act == "3":
             print("\nSimulation de la saison régulière...")
@@ -1481,72 +1482,29 @@ def game_loop():
         elif act == "5":
             league.advance_season()
             print("\nLes joueurs ont vieilli. Les statistiques ont évolué.")
-                        if act == "1":
-                            for role, p in user_team.roster.items():
-                                print(f"{role.value}: {p.name if p else 'VIDE'} | Rating: {p.get_overall_rating():.1f} | Age: {p.age if p else 'N/A'}")
-                        
-                        elif act == "2":
-                            print("\nLe marché est actuellement géré via la console.")
-                            # La logique du marché reste en console pour l'instant
 
         elif act == "6":
             try:
                 save_game(league)
             except Exception as e:
                 print(f"Erreur lors de la sauvegarde : {e}")
-                        elif act == "3":
-                            print("\nSimulation de la saison régulière...")
-                            league.create_round_robin_schedule()
-                            league.run_season()
-                            print("Saison régulière terminée !")
-                            input("\nAppuyez sur Entrée pour lancer les PLAYOFFS...")
-                            league.run_playoffs()
 
         elif act == "7":
             try:
                 loaded_league = load_game()
                 if loaded_league:
                     league = loaded_league
-                    # Retrouver l'objet 'user_team' dans la nouvelle instance de la ligue
-                    user_team_found = next((t for t in league.teams if t.name == user_team.name), None) # type: ignore
+                    user_team_found = next((t for t in league.teams if t.name == user_team.name), None)
                     if user_team_found:
                         user_team = user_team_found
             except FileNotFoundError:
                 # Le message est déjà géré dans load_game, on ne fait rien ici.
                 pass
-            except Exception as e: # type: ignore
+            except Exception as e:
                 print(f"Erreur lors du chargement : {e}")
-                        elif act == "4":
-                            print("\n=== CLASSEMENT ===")
-                            rankings = league.get_rankings()
-                            for name, stats in rankings:
-                                print(f"{name}: {stats['wins']}V - {stats['losses']}D")
 
         elif act == "0":
             break
-                        elif act == "5":
-                            league.advance_season()
-                            print("\nLes joueurs ont vieilli. Les statistiques ont évolué.")
-
-                        elif act == "6":
-                            save_game(league)
-
-                        elif act == "7.":
-                            try:
-                                loaded_league = load_game()
-                                if loaded_league:
-                                    league = loaded_league
-                                    user_team_found = next((t for t in league.teams if t.name == user_team.name), None)
-                                    if user_team_found:
-                                        user_team = user_team_found
-                            except FileNotFoundError:
-                                pass
-                            except Exception as e:
-                                print(f"Erreur lors du chargement : {e}")
-
-                        elif act == "0":
-                            pygame.quit()
-                            sys.exit()
 
         # --- Dessin ---
         screen.fill(BG_COLOR)
