@@ -6,11 +6,11 @@ from moba_manager import (
     Team, Role, CalibrationTools, MatchSimulator, create_initial_roster,
     load_game, save_game, League, generate_league_teams, CHAMPIONS_DB
 )
-from gui_match import MatchDashboard
-from gui_market import MarketManager
-from gui_draft import DraftManager
-from gui_setup import draw_team_logo, ProfileSetup
-from gui_email import EmailGUI
+from UI.gui_match import MatchDashboard
+from UI.gui_market import MarketManager
+from UI.gui_draft import DraftManager
+from UI.gui_setup import draw_team_logo, ProfileSetup
+from UI.gui_email import EmailGUI
 
 # --- CONSTANTES ---
 SCREEN_WIDTH = 1280
@@ -378,7 +378,7 @@ class MobaGui:
 
     def _quick_save(self):
         try:
-            save_game(self.league, "savegame.json")
+            save_game(self.league, "data/savegame.json")
             self._set_toast("Sauvegarde OK")
         except Exception:
             self._set_toast("Erreur sauvegarde")
@@ -387,7 +387,7 @@ class MobaGui:
         previous_state = self.current_state
         league = None
         try:
-            league = load_game("savegame.json")
+            league = load_game("data/savegame.json")
         except Exception:
             league = None
 

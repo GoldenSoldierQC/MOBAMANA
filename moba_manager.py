@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 import math
 import random
 import json
-from email_manager import EmailManager, EmailEvent
+from AI.email_manager import EmailManager, EmailEvent
 import pygame
 import sys
 
@@ -56,6 +56,53 @@ STARTER_KITS = {
         "distribution": {Role.JUNGLE: "Pro", Role.ADC: "Pro", Role.TOP: "Rookie", Role.MID: "Rookie", Role.SUPPORT: "Rookie"}
     }
 }
+
+
+# ============================================================================
+# 1b. SYSTÈME DE SPONSORS (ScriptableObjects)
+# ============================================================================
+@dataclass
+class ScriptableObject:
+    """
+    Pattern 'ScriptableObject' (Inspiré de Unity).
+    Sert de conteneur de données pour les Assets du jeu.
+    """
+    id: str
+
+@dataclass
+class Sponsor(ScriptableObject):
+    name: str
+    desc: str
+    precision_bonus: float = 0.0  # Ex: 0.15 pour +15%
+    budget_impact: int = 0        # Revenu hebdomadaire ajouté
+    
+    def apply_effect(self, team: 'Team'):
+        """Applique les bonus du sponsor à une équipe donnée."""
+        print(f"--- [SPONSOR] Activation de {self.name} ---")
+        
+        # 1. Application des bonus de stats (Précision = Mécaniques)
+        if self.precision_bonus > 0:
+            print(f"   > Application du bonus de précision : +{int(self.precision_bonus * 100)}%")
+            for player in team.all_players:
+                base_mec = player.mec
+                bonus = int(base_mec * self.precision_bonus)
+                player.mec = min(99, base_mec + bonus)
+                # On booste aussi légèrement la Vision (précision de l'info)
+                player.vis = min(99, player.vis + int(player.vis * (self.precision_bonus / 3)))
+        
+        # 2. Impact Budgétaire (FinanceManager)
+        if team.finance:
+            team.finance.weekly_revenue += self.budget_impact
+            print(f"   > Impact Budget : +{self.budget_impact}$ / semaine")
+
+# --- INSTANCES DE SPONSORS (Assets) ---
+NeuroLink = Sponsor(
+    id="sp_neurolink_01",
+    name="NeuroLink",
+    desc="Implants neuronaux augmentant la synchronisation oeil-main.",
+    precision_bonus=0.15,
+    budget_impact=8000
+)
 
 
 # ============================================================================
@@ -647,8 +694,6 @@ class MatchSimulator:
         self.blue_strategy = blue_strat
         self.red_strategy = red_strat
 
-    # ...
-
     def simulate_step(self):
         """Simule une minute de jeu avec Logique Tactique"""
         if self.is_finished:
@@ -704,13 +749,14 @@ class MatchSimulator:
                 all_allies = self.blue.players if winner_key == "blue" else self.red.players
                 if not all_allies:
                     return # Protection
-                killer = random.choice(all_allies)
-                killer.kills += 1
-                teammates = [p for p in all_allies if p != killer]
                 if teammates:
                     random.choice(teammates).assists += 1
-                victim = random.choice(self.red.players if winner_key == "blue" else self.blue.players)
-                victim.deaths += 1
+                
+                # SÉCURITÉ : Vérifier qu'il y a des victimes potentielles
+                enemies = self.red.players if winner_key == "blue" else self.blue.players
+                if enemies:
+                    victim = random.choice(enemies)
+                    victim.deaths += 1
                 
             # Mise à jour de l'or (approx: 1 point = 300 gold)
             if winner_key == "blue":
@@ -853,7 +899,9 @@ class MatchSimulator:
         if count == 0:
             return 10.0
             
-        base_power = total_sp / 5
+        # SÉCURITÉ : On utilise le nombre réel de joueurs pour éviter de pénaliser les équipes incomplètes (en test)
+        # Cela donne une "Puissance Moyenne" plutôt qu'une somme absolue.
+        base_power = total_sp / count
         
         # 4. Application de la synergie
         synergy_impact = self.engine.calculate_synergy_impact(base_power, 1.1)
@@ -1245,7 +1293,7 @@ class League:
         champion.prestige = min(100, champion.prestige + 5)
         return champion.name
 
-def save_game(league: League, filename="savegame.json"):
+def save_game(league: League, filename="data/savegame.json"):
     """Convertit les données de la ligue en JSON et les sauvegarde dans un fichier."""
     data = {
         "league_name": league.name,
@@ -1291,7 +1339,7 @@ def save_game(league: League, filename="savegame.json"):
         json.dump(data, f, indent=4, ensure_ascii=False)
     print(f"\n✅ Partie sauvegardée sous '{filename}' !")
 
-def load_game(filename="savegame.json") -> Optional[League]:
+def load_game(filename="data/savegame.json") -> Optional[League]:
     """Charge les données depuis un fichier JSON et reconstruit les objets du jeu."""
     try:
         with open(filename, "r", encoding="utf-8") as f:
