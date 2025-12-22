@@ -1451,8 +1451,6 @@ def game_loop():
                         print("Erreur lors de la saisie de l'offre.")
                 else: # type: ignore
                     print("Index de joueur invalide.")
-        mouse_pos = pygame.mouse.get_pos()
- act_from_gui = None # This line was causing the error, it should be part of the if/elif chain or removed.
 
         elif act == "3":
             print("\nSimulation de la saison régulière...")
@@ -1469,15 +1467,7 @@ def game_loop():
             rankings = league.get_rankings()
             for name, stats in rankings:
                 print(f"{name}: {stats['wins']}V - {stats['losses']}D")
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                for key, rect in button_rects.items():
-                    if rect.collidepoint(mouse_pos):
-                        act = key
-                        print(f"\nAction: {menu_options[act]}")
+            # Suppression de la boucle d'événements en double
 
         elif act == "5":
             league.advance_season()
@@ -1506,6 +1496,22 @@ def game_loop():
         elif act == "0":
             break
 
+        # Gestion des événements Pygame
+        mouse_pos = pygame.mouse.get_pos()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for key, rect in button_rects.items():
+                    if rect.collidepoint(mouse_pos):
+                        act = key
+                        print(f"\nAction: {menu_options[act]}")
+                        # Traiter immédiatement l'action du bouton
+                        if act in ["0", "1", "2", "3", "4", "5", "6", "7"]:
+                            break  # Sortir de la boucle pour traiter l'action dans la boucle principale
+                continue  # Passer à l'itération suivante de la boucle principale
+
         # --- Dessin ---
         screen.fill(BG_COLOR)
 
@@ -1515,13 +1521,15 @@ def game_loop():
         screen.blit(title_text, title_rect)
 
         # Budget
-        budget_text = font.render(f"Budget: {user_team.current_budget:,}€", True, TEXT_COLOR)
+        budget_text = font.render(f"Budget: {user_team.budget:,}€", True, TEXT_COLOR)
         budget_rect = budget_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
         screen.blit(budget_text, budget_rect)
 
         # Boutons
         for key, rect in button_rects.items():
-            color = BUTTON_HOVER_COLOR if rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            # Vérifier si la souris est sur le bouton
+            is_hovered = rect.collidepoint(mouse_pos) if 'mouse_pos' in locals() else False
+            color = BUTTON_HOVER_COLOR if is_hovered else BUTTON_COLOR
             pygame.draw.rect(screen, color, rect, border_radius=10)
             text_surf = font.render(menu_options[key], True, TEXT_COLOR)
             text_rect = text_surf.get_rect(center=rect.center)
