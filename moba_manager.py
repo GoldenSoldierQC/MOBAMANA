@@ -1414,12 +1414,16 @@ def game_loop():
         y_pos += 60
 
     # 3. Boucle principale
+    # 3. Boucle principale
+    gui_mode = False
     while True:
-        print(f"\n--- {user_team.name} | Budget: {user_team.budget}€ ---")
-        print("[1] Roster [2] Marché [3] Saison [4] Classement")
-        print("[5] New Season [6] Sauvegarder [7] Charger [0] Quitter")
-        
-        act = input("\nChoix : ")
+        if not gui_mode:
+            print(f"\n--- {user_team.name} | Budget: {user_team.current_budget:,}€ ---")
+            print("[1] Roster [2] Marché [3] Saison [4] Classement")
+            print("[5] New Season [6] Sauvegarder [7] Charger [0] Quitter")
+            act = input("\nChoix : ")
+        else:
+            act = None
         
         if act == "1":
             for role, p in user_team.roster.items(): # type: ignore
@@ -1506,6 +1510,7 @@ def game_loop():
                 for key, rect in button_rects.items():
                     if rect.collidepoint(mouse_pos):
                         act = key
+                        gui_mode = True
                         print(f"\nAction: {menu_options[act]}")
                         break  # Sortir de la boucle des boutons et traiter l'action
 
@@ -1531,6 +1536,10 @@ def game_loop():
             text_surf = font.render(menu_options[key], True, TEXT_COLOR)
             text_rect = text_surf.get_rect(center=rect.center)
             screen.blit(text_surf, text_rect)
+            
+        # Si on est en mode GUI, on réinitialise pour la prochaine itération
+        if gui_mode and act is not None:
+            gui_mode = False
 
         pygame.display.flip()
 
